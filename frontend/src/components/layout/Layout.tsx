@@ -42,7 +42,7 @@ const navItems = [
 ];
 
 // Fixed drawer width - slightly more spacious
-const drawerWidth = 55;
+const drawerWidth = 57;
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const theme = useTheme();
@@ -83,7 +83,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     position: 'relative',
                     // justifyContent: 'center',
                     p: 1.1,
-                    borderRadius: '50%',
+                    borderRadius: '35%',
                     overflow: 'hidden',
                     minWidth: '40px',
                     maxWidth: '40px',
