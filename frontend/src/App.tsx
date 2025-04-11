@@ -5,6 +5,7 @@ import AppThemeProvider from './theme/AppThemeProvider';
 import Layout from './components/layout/Layout';
 // Pages
 import HomePage from './pages/HomePage';
+import UploadPage from './pages/UploadPage';
 import './App.css';
 
 function App () {
@@ -17,8 +18,8 @@ function App () {
             <Route path="/" element={<HomePage />} />
             
             {/* Document Management */}
-            {/* <Route path="/upload" element={<UploadPage />} />
-            <Route path="/documents" element={<PdfListPage />} /> */}
+            <Route path="/upload" element={<UploadPage />} />
+            {/* <Route path="/documents" element={<ViewDocumentsPage />} /> */}
             
             {/* Data Analysis */}
             {/* <Route path="/visualizations" element={<VisualizationsPage />} />

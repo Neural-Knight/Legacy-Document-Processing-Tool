@@ -81,12 +81,12 @@ Extract meaningful insights and get accurate answers with ease.',
         >
           <Typography variant="h3" component="h1" gutterBottom sx={{ 
             fontWeight: 700,
-            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})` ,
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             textShadow: '0 2px 10px rgba(0,0,0,0.05)',
           }}>
-            Legacy Data Bot
+            Legacy Document Manager
           </Typography>
           <Typography variant="h6" sx={{ 
             maxWidth: '800px', 
