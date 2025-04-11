@@ -31,32 +31,97 @@ import TableChartIcon from '@mui/icons-material/TableChart';
 import CodeIcon from '@mui/icons-material/Code';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import FilePresentIcon from '@mui/icons-material/FilePresent';
+import ErrorIcon from '@mui/icons-material/Error';
 import { useNavigate } from 'react-router-dom';
 import { uploadDocument } from "../services/documentService"; // Adjust the import path as necessary
 import { motion } from 'framer-motion'; // You'll need to install this package
 import { fileStorage } from '../utils/fileStorage';
+
+// New interface to track individual file upload status
+interface FileUploadStatus {
+  fileIndex: number;
+  uploading: boolean;
+  progress: number;
+  error: string | null;
+  success: boolean;
+  cancelled: boolean;
+}
 
 const UploadFilePage: React.FC = () => {
   const theme = useTheme();
   const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isPageDragging, setIsPageDragging] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [uploadingAny, setUploadingAny] = useState(false);
+  const [overallProgress, setOverallProgress] = useState(0);
+  const [globalError, setGlobalError] = useState<string | null>(null);
+  const [globalSuccess, setGlobalSuccess] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropAreaRef = useRef<HTMLDivElement>(null);
   const [dragCounter, setDragCounter] = useState(0);
   const [pageDragCounter, setPageDragCounter] = useState(0);
+  // Track individual file upload status
+  const [fileStatuses, setFileStatuses] = useState<FileUploadStatus[]>([]);
   const navigate = useNavigate();
   
   const isDarkMode = theme.palette.mode === 'dark';
   
   // Track mouse position for interactive background effects
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  // Initialize file statuses when files change
+  useEffect(() => {
+    // Initialize status for each file that doesn't have one yet
+    const newStatuses = files.map((_, index) => {
+      // Find existing status or create a new one
+      const existingStatus = fileStatuses.find(status => status.fileIndex === index);
+      if (existingStatus) {
+        return existingStatus;
+      }
+      return {
+        fileIndex: index,
+        uploading: false,
+        progress: 0,
+        error: null,
+        success: false,
+        cancelled: false
+      };
+    });
+    
+    setFileStatuses(newStatuses);
+  }, [files]);
+
+  // Calculate overall progress based on individual file progress
+  useEffect(() => {
+    if (fileStatuses.length === 0) {
+      setOverallProgress(0);
+      return;
+    }
+    
+    const uploadingStatuses = fileStatuses.filter(status => status.uploading || status.success);
+    if (uploadingStatuses.length === 0) {
+      setOverallProgress(0);
+      return;
+    }
+    
+    const totalProgress = uploadingStatuses.reduce((sum, status) => sum + status.progress, 0);
+    setOverallProgress(Math.round(totalProgress / uploadingStatuses.length));
+    
+    // Check if all files have been processed (success or error)
+    const allProcessed = fileStatuses.every(status => 
+      status.success || (status.error !== null) || status.cancelled
+    );
+    
+    // Set global uploading state
+    setUploadingAny(fileStatuses.some(status => status.uploading));
+    
+    // Set global success state if all files have been processed and at least one succeeded
+    if (allProcessed && fileStatuses.some(status => status.success)) {
+      setGlobalSuccess(true);
+    }
+  }, [fileStatuses]);
 
   // Listen for page-level drag events
   useEffect(() => {
@@ -118,7 +183,7 @@ const UploadFilePage: React.FC = () => {
     if (!dropArea) return;
 
     const updateBackgroundEffect = () => {
-      if (isDragging || uploading) return;
+      if (isDragging || uploadingAny) return;
       
       const rect = dropArea.getBoundingClientRect();
       
@@ -158,29 +223,48 @@ const UploadFilePage: React.FC = () => {
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [isDragging, uploading, mousePosition, isDarkMode]);
+  }, [isDragging, uploadingAny, mousePosition, isDarkMode]);
   
-  // Simulate progress updates during processing
-  const simulateProgress = useCallback(() => {
-    // Reset progress
-    setProgress(0);
-    
-    // Simulate file upload progress (0-50%)
+  // Simulate progress updates during processing for a specific file
+  const simulateProgress = useCallback((fileIndex: number) => {
+    // Start file upload simulation (0-50%)
     const uploadInterval = setInterval(() => {
-      setProgress(prev => {
-        if (prev < 50) return prev + 1;
-        clearInterval(uploadInterval);
-        return 50;
+      setFileStatuses(prevStatuses => {
+        const newStatuses = [...prevStatuses];
+        const statusIndex = newStatuses.findIndex(s => s.fileIndex === fileIndex);
+        
+        if (statusIndex === -1 || newStatuses[statusIndex].progress >= 50 || !newStatuses[statusIndex].uploading) {
+          clearInterval(uploadInterval);
+          return prevStatuses;
+        }
+        
+        newStatuses[statusIndex] = {
+          ...newStatuses[statusIndex],
+          progress: newStatuses[statusIndex].progress + 1
+        };
+        
+        return newStatuses;
       });
     }, 50);
     
     // After reaching 50%, simulate processing progress (50-100%)
     setTimeout(() => {
       const processInterval = setInterval(() => {
-        setProgress(prev => {
-          if (prev < 95) return prev + 1;
-          clearInterval(processInterval);
-          return 95;
+        setFileStatuses(prevStatuses => {
+          const newStatuses = [...prevStatuses];
+          const statusIndex = newStatuses.findIndex(s => s.fileIndex === fileIndex);
+          
+          if (statusIndex === -1 || newStatuses[statusIndex].progress >= 95 || !newStatuses[statusIndex].uploading) {
+            clearInterval(processInterval);
+            return prevStatuses;
+          }
+          
+          newStatuses[statusIndex] = {
+            ...newStatuses[statusIndex],
+            progress: newStatuses[statusIndex].progress + 1
+          };
+          
+          return newStatuses;
         });
       }, 200);
     }, 2500);
@@ -254,11 +338,11 @@ const UploadFilePage: React.FC = () => {
     
     if (validFiles.length > 0) {
       setFiles(prev => [...prev, ...validFiles]);
-      setError(null);
+      setGlobalError(null);
     }
     
     if (errors.length > 0) {
-      setError(errors.join('. '));
+      setGlobalError(errors.join('. '));
     }
   };
   
@@ -274,7 +358,41 @@ const UploadFilePage: React.FC = () => {
   
   const handleRemoveFile = async (index: number) => {
     const fileToRemove = files[index];
-    setFiles(prev => prev.filter((_, i) => i !== index));
+    
+    // Cancel upload if in progress
+    if (fileStatuses[index]?.uploading) {
+      setFileStatuses(prev => {
+        const newStatuses = [...prev];
+        const statusIndex = newStatuses.findIndex(s => s.fileIndex === index);
+        if (statusIndex !== -1) {
+          newStatuses[statusIndex] = {
+            ...newStatuses[statusIndex],
+            uploading: false,
+            cancelled: true,
+            error: "Upload cancelled"
+          };
+        }
+        return newStatuses;
+      });
+    }
+    
+    // Remove file from list
+    setFiles(prev => {
+      const newFiles = [...prev];
+      newFiles.splice(index, 1);
+      return newFiles;
+    });
+    
+    // Update other files' indexes
+    setFileStatuses(prev => {
+      return prev
+        .filter(status => status.fileIndex !== index)
+        .map(status => ({
+          ...status,
+          fileIndex: status.fileIndex > index ? status.fileIndex - 1 : status.fileIndex
+        }));
+    });
+    
     try {
       await fileStorage.removeFile(fileToRemove);
     } catch (error) {
@@ -342,10 +460,31 @@ const UploadFilePage: React.FC = () => {
 
   // Modify handleCancel to clear IndexedDB
   const handleCancel = async () => {
+    // Cancel all in-progress uploads
+    fileStatuses.forEach(status => {
+      if (status.uploading) {
+        setFileStatuses(prev => {
+          const newStatuses = [...prev];
+          const statusIndex = newStatuses.findIndex(s => s.fileIndex === status.fileIndex);
+          if (statusIndex !== -1) {
+            newStatuses[statusIndex] = {
+              ...newStatuses[statusIndex],
+              uploading: false,
+              cancelled: true,
+              error: "Upload cancelled"
+            };
+          }
+          return newStatuses;
+        });
+      }
+    });
+    
     setFiles([]);
-    setUploading(false);
-    setProgress(0);
-    setError(null);
+    setFileStatuses([]);
+    setUploadingAny(false);
+    setOverallProgress(0);
+    setGlobalError(null);
+    setGlobalSuccess(false);
     await fileStorage.clearFiles();
     
     if (previewUrl) {
@@ -355,32 +494,150 @@ const UploadFilePage: React.FC = () => {
     }
   };
 
-  // Modify handleUpload to clear storage after successful upload
+  // Upload a single file with progress tracking
+  const uploadSingleFile = async (fileIndex: number) => {
+    const file = files[fileIndex];
+    if (!file) return;
+    
+    // Set file as uploading
+    setFileStatuses(prev => {
+      const newStatuses = [...prev];
+      const statusIndex = newStatuses.findIndex(s => s.fileIndex === fileIndex);
+      if (statusIndex !== -1) {
+        newStatuses[statusIndex] = {
+          ...newStatuses[statusIndex],
+          uploading: true,
+          progress: 0,
+          error: null,
+          success: false,
+          cancelled: false
+        };
+      }
+      return newStatuses;
+    });
+    
+    // Start progress simulation
+    simulateProgress(fileIndex);
+    
+    try {
+      // Use the actual API with progress tracking
+      const result = await uploadDocument(
+        file,
+        (progress) => {
+          // Update progress from the actual API
+          setFileStatuses(prev => {
+            const newStatuses = [...prev];
+            const statusIndex = newStatuses.findIndex(s => s.fileIndex === fileIndex);
+            if (statusIndex !== -1 && !newStatuses[statusIndex].cancelled) {
+              newStatuses[statusIndex] = {
+                ...newStatuses[statusIndex],
+                progress: Math.min(progress, 95) // Cap at 95% until fully complete
+              };
+            }
+            return newStatuses;
+          });
+        }
+      );
+      
+      // Mark as complete
+      setFileStatuses(prev => {
+        const newStatuses = [...prev];
+        const statusIndex = newStatuses.findIndex(s => s.fileIndex === fileIndex);
+        if (statusIndex !== -1 && !newStatuses[statusIndex].cancelled) {
+          newStatuses[statusIndex] = {
+            ...newStatuses[statusIndex],
+            uploading: false,
+            progress: 100,
+            success: true
+          };
+        }
+        return newStatuses;
+      });
+      
+      return result;
+    } catch (err) {
+      // Handle error for this specific file
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred during upload';
+      
+      setFileStatuses(prev => {
+        const newStatuses = [...prev];
+        const statusIndex = newStatuses.findIndex(s => s.fileIndex === fileIndex);
+        if (statusIndex !== -1 && !newStatuses[statusIndex].cancelled) {
+          newStatuses[statusIndex] = {
+            ...newStatuses[statusIndex],
+            uploading: false,
+            error: errorMessage
+          };
+        }
+        return newStatuses;
+      });
+      
+      throw err;
+    }
+  };
+
+  // Modify handleUpload to process all files in parallel
   const handleUpload = async () => {
     if (files.length === 0) return;
     
+    // Reset global states
+    setGlobalError(null);
+    setGlobalSuccess(false);
+    setUploadingAny(true);
+    
+    // Process all files in parallel
+    const uploadPromises = files.map((_, index) => {
+      // Skip files that are already uploaded or have errors
+      const status = fileStatuses.find(s => s.fileIndex === index);
+      if (status?.success || status?.error) {
+        return Promise.resolve();
+      }
+      return uploadSingleFile(index).catch(err => {
+        console.error(`Error uploading file ${index}:`, err);
+        // We've already handled the error in uploadSingleFile
+        // Just catching here to prevent the Promise.all from failing completely
+      });
+    });
+    
     try {
-      setUploading(true);
-      setError(null);
-      simulateProgress();
+      await Promise.all(uploadPromises);
       
-      const result = await uploadDocument(files[0]);
+      // Count successful uploads
+      const successCount = fileStatuses.filter(s => s.success).length;
       
-      setProgress(100);
-      setSuccess(true);
-      
-      // Clear files from IndexedDB after successful upload
-      await fileStorage.clearFiles();
-      
-      setTimeout(() => {
-        setFiles([]);
-        setUploading(false);
-      }, 2000);
-      
+      if (successCount > 0) {
+        // If we have at least one success, consider the overall operation successful
+        setGlobalSuccess(true);
+        
+        // Remove successfully uploaded files from storage after a delay
+        setTimeout(async () => {
+          // Get indexes of successful files
+          const successIndexes = fileStatuses
+            .filter(s => s.success)
+            .map(s => s.fileIndex);
+          
+          // Update files state to remove successful files
+          setFiles(prev => prev.filter((_, i) => !successIndexes.includes(i)));
+          
+          // Update fileStatuses to remove successful files
+          setFileStatuses(prev => prev.filter(s => !successIndexes.includes(s.fileIndex)));
+          
+          // Clear files from storage
+          await fileStorage.clearFiles();
+          
+          // If any files remain, store them
+          if (files.length > successIndexes.length) {
+            const remainingFiles = files.filter((_, i) => !successIndexes.includes(i));
+            await fileStorage.storeFiles(remainingFiles);
+          }
+        }, 2000);
+      }
     } catch (err) {
-      setUploading(false);
-      setProgress(0);
-      setError(err instanceof Error ? err.message : 'An error occurred during upload');
+      // This won't get called unless there's an unhandled error
+      console.error('Unhandled error during upload:', err);
+    } finally {
+      // Update uploading state based on individual file states
+      setUploadingAny(fileStatuses.some(s => s.uploading));
     }
   };
   
@@ -433,6 +690,34 @@ const UploadFilePage: React.FC = () => {
     
     // Default icon for other types
     return <FilePresentIcon sx={{ color: theme.palette.text.secondary }} />;
+  };
+
+  // Get status text for a file
+  const getFileStatusText = (index: number) => {
+    const status = fileStatuses.find(s => s.fileIndex === index);
+    
+    if (!status) return '';
+    if (status.success) return 'Completed';
+    if (status.error) return 'Failed';
+    if (status.cancelled) return 'Cancelled';
+    if (status.uploading) {
+      if (status.progress < 50) return 'Uploading...';
+      if (status.progress < 95) return 'Processing...';
+      return 'Finalizing...';
+    }
+    
+    return '';
+  };
+
+  // Get progress color for a file
+  const getProgressColor = (index: number) => {
+    const status = fileStatuses.find(s => s.fileIndex === index);
+    
+    if (!status) return theme.palette.primary.main;
+    if (status.success) return theme.palette.success.main;
+    if (status.error || status.cancelled) return theme.palette.error.main;
+    
+    return theme.palette.primary.main;
   };
 
   return (
@@ -526,7 +811,7 @@ const UploadFilePage: React.FC = () => {
               : theme.palette.primary.main,
             backgroundClip: 'text',
             WebkitBackgroundClip: 'text',
-            // color: 'transparent',
+            color: 'transparent',
             fontWeight: 700,
             mb: 2
           }}
@@ -573,7 +858,7 @@ const UploadFilePage: React.FC = () => {
             position: 'relative',
             overflow: 'hidden',
             minHeight: 220,
-            backgroundImage: isDarkMode && !isDragging && !uploading
+            backgroundImage: isDarkMode && !isDragging && !uploadingAny
               ? 'radial-gradient(circle, rgba(29,222,240,0.07) 0%, rgba(123,232,84,0.04) 100%)' 
               : undefined,
             backgroundSize: '200% 200%',
@@ -612,7 +897,7 @@ const UploadFilePage: React.FC = () => {
             style={{ display: 'none' }}
             accept="*/*" // Accept all file types
             onChange={handleFileChange}
-            disabled={uploading}
+            disabled={uploadingAny}
             multiple
           />
           
@@ -695,7 +980,7 @@ const UploadFilePage: React.FC = () => {
                   : undefined,
                 backgroundClip: isDarkMode ? 'text' : undefined,
                 WebkitBackgroundClip: isDarkMode ? 'text' : undefined,
-                // color: isDarkMode ? 'transparent' : 'text.primary',
+                color: isDarkMode ? 'transparent' : 'text.primary',
               }}
             >
               {files.length > 0 
@@ -768,117 +1053,182 @@ const UploadFilePage: React.FC = () => {
                 pr: 1
               }}
             >
-              {files.map((file, index) => (
-                <Zoom in key={`${file.name}-${index}`} style={{ transitionDelay: `${index * 100}ms` }}>
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      p: 1.5,
-                      mb: 1,
-                      borderRadius: 2,
-                      backgroundColor: isDarkMode 
-                        ? alpha(theme.palette.background.paper, 0.8)
-                        : alpha(theme.palette.background.paper, 0.9),
-                      border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                      backdropFilter: 'blur(4px)',
-                      boxShadow: isDarkMode? `0 2px 6px ${alpha(theme.palette.common.black, 0.2)}`
-                      :'0 2px 6px rgba(0,0,0,0.05)',
-                      transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                      position: 'relative',
-                      overflow: 'hidden',
-                      
-                      '&:hover': {
+              {files.map((file, index) => {
+                const status = fileStatuses.find(s => s.fileIndex === index);
+                const isUploading = status?.uploading || false;
+                const progress = status?.progress || 0;
+                const hasError = status?.error !== null;
+                const isSuccess = status?.success || false;
+                const statusText = getFileStatusText(index);
+                const progressColor = getProgressColor(index);
+                
+                return (
+                  <Zoom in key={`${file.name}-${index}`} style={{ transitionDelay: `${index * 100}ms` }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        p: 1.5,
+                        mb: 1,
+                        borderRadius: 2,
                         backgroundColor: isDarkMode 
-                          ? alpha(theme.palette.background.paper, 0.95)
-                          : alpha(theme.palette.background.paper, 1),
+                          ? alpha(theme.palette.background.paper, 0.8)
+                          : alpha(theme.palette.background.paper, 0.9),
+                        border: `1px solid ${alpha(
+                          isSuccess ? theme.palette.success.main : 
+                          hasError ? theme.palette.error.main :
+                          theme.palette.divider, 
+                          isSuccess || hasError ? 0.3 : 0.1
+                        )}`,
+                        backdropFilter: 'blur(4px)',
                         boxShadow: isDarkMode
-                          ? `0 3px 0px ${alpha(theme.palette.primary.light, 0.15)}`
-                          : `0 3px 0px ${alpha(theme.palette.primary.main, 0.15)}`,
-                        transform: 'translateY(-4px) scale(1.01)',
-                        border: `1px solid ${alpha(theme.palette.primary.main, isDarkMode ? 0.3 : 0.2)}`,
-                        '&:before': {
-                          opacity: 1,
+                          ? `0 2px 6px ${alpha(theme.palette.common.black, 0.2)}`
+                          : '0 2px 6px rgba(0,0,0,0.05)',
+                        transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        
+                        '&:hover': {
+                          backgroundColor: isDarkMode 
+                            ? alpha(theme.palette.background.paper, 0.95)
+                            : alpha(theme.palette.background.paper, 1),
+                          boxShadow: isDarkMode
+                            ? `0 3px 0px ${alpha(theme.palette.primary.light, 0.15)}`
+                            : `0 3px 0px ${alpha(theme.palette.primary.main, 0.15)}`,
+                          transform: 'translateY(-4px) scale(1.01)',
+                          border: `1px solid ${alpha(theme.palette.primary.main, isDarkMode ? 0.3 : 0.2)}`,
+                          '&:before': {
+                            opacity: 1,
+                          },
+                          '&:after': {
+                            left: '150%',
+                            opacity: 0.5,
+                            transition: 'left 1s ease',
+                          }
                         },
-                        '&:after': {
-                          left: '150%',
-                          opacity: 0.5,
-                          transition: 'left 1s ease',
+                        '&:active': {
+                          transform: 'translateY(-2px) scale(1.005)',
+                          boxShadow: isDarkMode
+                            ? `0 5px 10px ${alpha(theme.palette.common.black, 0.25)}, 0 0 0 1px ${alpha(theme.palette.primary.dark, 0.35)}`
+                            : `0 5px 10px ${alpha(theme.palette.primary.main, 0.1)}`,
+                          transition: 'all 0.15s ease',
                         }
-                      },
-                      '&:active': {
-                        transform: 'translateY(-2px) scale(1.005)',
-                        boxShadow: isDarkMode
-                          ? `0 5px 10px ${alpha(theme.palette.common.black, 0.25)}, 0 0 0 1px ${alpha(theme.palette.primary.dark, 0.35)}`
-                          : `0 5px 10px ${alpha(theme.palette.primary.main, 0.1)}`,
-                        transition: 'all 0.15s ease',
-                      }
-                    }}
-                  >
-                    {getFileIcon(file)}
-                    
-                    <Box sx={{ flexGrow: 1, ml: 1.5, overflow: 'hidden' }}>
-                      <Typography 
-                        variant="body2" 
-                        sx={{ 
-                          fontWeight: 'medium',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}
-                      >
-                        {file.name}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {formatFileSize(file.size)}
-                      </Typography>
-                    </Box>
-                    
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      {['pdf', 'jpg', 'jpeg', 'png', 'gif'].includes(file.name.split('.').pop()?.toLowerCase() || '') && (
-                        <Tooltip title="Preview">
-                          <IconButton 
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePreviewFile(file);
-                            }}
-                            sx={{
-                              color: theme.palette.primary.main,
-                              backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                              '&:hover': {
-                                backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                              },
-                              mr: 1
+                      }}
+                    >
+                      {/* File info row */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: isUploading || hasError || isSuccess ? 1 : 0 }}>
+                        {getFileIcon(file)}
+                        
+                        <Box sx={{ flexGrow: 1, ml: 1.5, overflow: 'hidden' }}>
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              fontWeight: 'medium',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
                             }}
                           >
-                            <VisibilityIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
+                            {file.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {formatFileSize(file.size)}
+                          </Typography>
+                        </Box>
+                        
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          {/* Status indicator */}
+                          {(isUploading || hasError || isSuccess) && (
+                            <Chip 
+                              size="small"
+                              label={statusText}
+                              color={
+                                isSuccess ? "success" : 
+                                hasError ? "error" : 
+                                "primary"
+                              }
+                              icon={
+                                isSuccess ? <CheckCircleIcon /> : 
+                                hasError ? <ErrorIcon /> : 
+                                <CircularProgress size={16} />
+                              }
+                              sx={{ mr: 1, height: 24 }}
+                            />
+                          )}
+                        
+                          {['pdf', 'jpg', 'jpeg', 'png', 'gif'].includes(file.name.split('.').pop()?.toLowerCase() || '') && (
+                            <Tooltip title="Preview">
+                              <IconButton 
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePreviewFile(file);
+                                }}
+                                sx={{
+                                  color: theme.palette.primary.main,
+                                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                  '&:hover': {
+                                    backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                                  },
+                                  mr: 1
+                                }}
+                              >
+                                <VisibilityIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          
+                          <Tooltip title={isUploading ? "Cancel" : "Remove"}>
+                            <IconButton 
+                              size="small"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await handleRemoveFile(index);
+                              }}
+                              sx={{
+                                color: theme.palette.error.main,
+                                backgroundColor: alpha(theme.palette.error.main, 0.1),
+                                '&:hover': {
+                                  backgroundColor: alpha(theme.palette.error.main, 0.2),
+                                }
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </Box>
                       
-                      <Tooltip title="Remove">
-                        <IconButton 
-                          size="small"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            await handleRemoveFile(index);
-                          }}
-                          sx={{
-                            color: theme.palette.error.main,
-                            backgroundColor: alpha(theme.palette.error.main, 0.1),
-                            '&:hover': {
-                              backgroundColor: alpha(theme.palette.error.main, 0.2),
-                            }
-                          }}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      {/* Progress bar */}
+                      {(isUploading || hasError || isSuccess) && (
+                        <Box sx={{ width: '100%', mt: 1 }}>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={progress} 
+                            sx={{ 
+                              height: 4, 
+                              borderRadius: 2,
+                              backgroundColor: alpha(progressColor, 0.15),
+                              '& .MuiLinearProgress-bar': {
+                                backgroundColor: progressColor,
+                                borderRadius: 2,
+                                transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                              }
+                            }} 
+                          />
+                          
+                          {/* Error message if there is one */}
+                          {hasError && status?.error && (
+                            <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
+                              {status.error}
+                            </Typography>
+                          )}
+                        </Box>
+                      )}
                     </Box>
-                  </Box>
-                </Zoom>
-              ))}
+                  </Zoom>
+                );
+              })}
             </Box>
           </Paper>
         </motion.div>
@@ -895,9 +1245,11 @@ const UploadFilePage: React.FC = () => {
               variant="contained"
               color="primary"
               size="large"
-              startIcon={uploading ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />}
+              startIcon={uploadingAny ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />}
               onClick={handleUpload}
-              disabled={uploading || files.length === 0}
+              disabled={uploadingAny || files.length === 0 || files.every((_, i) => 
+                fileStatuses.find(s => s.fileIndex === i)?.success
+              )}
               sx={{ 
                 minWidth: 180,
                 height: 54,
@@ -922,7 +1274,7 @@ const UploadFilePage: React.FC = () => {
                 } : {},
               }}
             >
-              {uploading ? 'Processing...' : 'Upload Now'}
+              {uploadingAny ? 'Uploading...' : 'Upload All'}
             </Button>
             
             <Button
@@ -931,7 +1283,7 @@ const UploadFilePage: React.FC = () => {
               size="large"
               startIcon={<CancelIcon />}
               onClick={handleCancel}
-              disabled={uploading}
+              disabled={files.length === 0}
               sx={{ 
                 minWidth: 150,
                 height: 54,
@@ -943,13 +1295,13 @@ const UploadFilePage: React.FC = () => {
                 }
               }}
             >
-              Cancel
+              Cancel All
             </Button>
           </Stack>
         </motion.div>
       )}
       
-      {uploading && (
+      {uploadingAny && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
@@ -963,37 +1315,31 @@ const UploadFilePage: React.FC = () => {
               mb: 1 
             }}>
               <Typography variant="body2" color="text.secondary">
-                {progress < 50 
-                  ? 'Uploading file...' 
-                  : progress < 95 
-                    ? 'Extracting content...' 
-                    : progress < 100 
-                      ? 'Finalizing...' 
-                      : 'Completed!'}
+                Overall Upload Progress
               </Typography>
               <Typography 
                 variant="body2" 
                 sx={{ 
                   fontWeight: 'bold',
-                  color: progress === 100 
+                  color: overallProgress === 100 
                     ? theme.palette.success.main 
                     : theme.palette.primary.main
                 }}
               >
-                {progress}%
+                {overallProgress}%
               </Typography>
             </Box>
             
             <Box sx={{ position: 'relative' }}>
               <LinearProgress 
                 variant="determinate" 
-                value={progress} 
+                value={overallProgress} 
                 sx={{ 
                   height: 10, 
                   borderRadius: 5,
                   backgroundColor: alpha(theme.palette.primary.main, 0.15),
                   '& .MuiLinearProgress-bar': {
-                    backgroundColor: progress === 100 
+                    backgroundColor: overallProgress === 100 
                       ? theme.palette.success.main 
                       : theme.palette.primary.main,
                     borderRadius: 5,
@@ -1002,7 +1348,7 @@ const UploadFilePage: React.FC = () => {
                 }} 
               />
               
-              {progress > 0 && progress < 100 && (
+              {overallProgress > 0 && overallProgress < 100 && (
                 <Box
                   sx={{
                     position: 'absolute',
@@ -1031,34 +1377,9 @@ const UploadFilePage: React.FC = () => {
               gap: 1,
               mt: 2 
             }}>
-              <Chip 
-                label="Uploading" 
-                size="small"
-                color={progress > 0 ? "primary" : "default"}
-                variant={progress >= 50 ? "outlined" : "filled"}
-                sx={{ borderRadius: '6px' }}
-              />
-              <Chip 
-                label="Extracting" 
-                size="small"
-                color={progress >= 50 ? "primary" : "default"}
-                variant={progress >= 95 ? "outlined" : "filled"}
-                sx={{ borderRadius: '6px' }}
-              />
-              <Chip 
-                label="Finalizing" 
-                size="small"
-                color={progress >= 95 ? "primary" : "default"}
-                variant={progress >= 100 ? "outlined" : "filled"}
-                sx={{ borderRadius: '6px' }}
-              />
-              <Chip 
-                label="Completed" 
-                size="small"
-                color={progress >= 100 ? "success" : "default"}
-                variant={progress < 100 ? "outlined" : "filled"}
-                sx={{ borderRadius: '6px' }}
-              />
+              <Typography variant="body2" color="text.secondary">
+                {fileStatuses.filter(s => s.success).length} of {files.length} files completed
+              </Typography>
             </Box>
           </Box>
         </motion.div>
@@ -1133,39 +1454,39 @@ const UploadFilePage: React.FC = () => {
       </Fade>
       
       <Snackbar 
-        open={!!error} 
+        open={!!globalError} 
         autoHideDuration={6000} 
-        onClose={() => setError(null)}
+        onClose={() => setGlobalError(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert 
           severity="error" 
-          onClose={() => setError(null)}
+          onClose={() => setGlobalError(null)}
           sx={{ 
             borderRadius: '10px',
             boxShadow: `0 8px 16px ${alpha(theme.palette.error.main, 0.24)}`
           }}
         >
-          {error}
+          {globalError}
         </Alert>
       </Snackbar>
       
       <Snackbar
-        open={success}
+        open={globalSuccess}
         autoHideDuration={6000}
-        onClose={() => setSuccess(false)}
+        onClose={() => setGlobalSuccess(false)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert 
           severity="success" 
           icon={<CheckCircleIcon fontSize="inherit" />}
-          onClose={() => setSuccess(false)}
+          onClose={() => setGlobalSuccess(false)}
           sx={{ 
             borderRadius: '10px',
             boxShadow: `0 8px 16px ${alpha(theme.palette.success.main, 0.24)}`
           }}
         >
-          Document processed successfully!
+          Documents processed successfully!
         </Alert>
       </Snackbar>
     </Box>

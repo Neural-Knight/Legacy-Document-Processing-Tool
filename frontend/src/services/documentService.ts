@@ -18,9 +18,13 @@ export interface Document {
 /**
  * Upload a document to the server
  * @param file The file to upload
+ * @param onUploadProgress Optional callback for upload progress
  * @returns Promise with the uploaded document data
  */
-export const uploadDocument = async (file: File): Promise<Document> => {
+export const uploadDocument = async (
+  file: File,
+  onUploadProgress?: (progress: number) => void
+): Promise<Document> => {
   const formData = new FormData();
   formData.append('file', file);
 
@@ -28,6 +32,15 @@ export const uploadDocument = async (file: File): Promise<Document> => {
     const response = await axios.post(`${API_URL}/upload`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          // Calculate upload percentage
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          onUploadProgress?.(percentCompleted);
+        }
       },
     });
     return response.data;
