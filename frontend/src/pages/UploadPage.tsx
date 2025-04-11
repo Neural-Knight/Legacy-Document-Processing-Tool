@@ -811,7 +811,6 @@ const UploadFilePage: React.FC = () => {
               : theme.palette.primary.main,
             backgroundClip: 'text',
             WebkitBackgroundClip: 'text',
-            color: 'transparent',
             fontWeight: 700,
             mb: 2
           }}
@@ -980,7 +979,6 @@ const UploadFilePage: React.FC = () => {
                   : undefined,
                 backgroundClip: isDarkMode ? 'text' : undefined,
                 WebkitBackgroundClip: isDarkMode ? 'text' : undefined,
-                color: isDarkMode ? 'transparent' : 'text.primary',
               }}
             >
               {files.length > 0 
