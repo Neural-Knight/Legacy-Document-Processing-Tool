@@ -34,6 +34,7 @@ import FilePresentIcon from '@mui/icons-material/FilePresent';
 import { useNavigate } from 'react-router-dom';
 import { uploadDocument } from "../services/documentService"; // Adjust the import path as necessary
 import { motion } from 'framer-motion'; // You'll need to install this package
+import { fileStorage } from '../utils/fileStorage';
 
 const UploadFilePage: React.FC = () => {
   const theme = useTheme();
@@ -271,9 +272,15 @@ const UploadFilePage: React.FC = () => {
     }
   };
   
-  const handleRemoveFile = (index: number) => {
+  const handleRemoveFile = async (index: number) => {
+    const fileToRemove = files[index];
     setFiles(prev => prev.filter((_, i) => i !== index));
-    
+    try {
+      await fileStorage.removeFile(fileToRemove);
+    } catch (error) {
+      console.error('Error removing file from storage:', error);
+    }
+  
     // If removing the previewed file, close the preview
     if (previewUrl && index === files.findIndex(file => URL.createObjectURL(file) === previewUrl)) {
       handleClosePreview();
@@ -301,7 +308,54 @@ const UploadFilePage: React.FC = () => {
       }
     }, 300);
   };
-  
+
+  // Load files from IndexedDB on component mount
+  useEffect(() => {
+    const loadStoredFiles = async () => {
+      try {
+        const storedFiles = await fileStorage.getFiles();
+        if (storedFiles.length > 0) {
+          setFiles(storedFiles);
+        }
+      } catch (error) {
+        console.error('Error loading stored files:', error);
+      }
+    };
+    
+    loadStoredFiles();
+  }, []);
+
+  // Store files in IndexedDB when they change
+  useEffect(() => {
+    const storeFiles = async () => {
+      try {
+        await fileStorage.storeFiles(files);
+      } catch (error) {
+        console.error('Error storing files:', error);
+      }
+    };
+
+    if (files.length > 0) {
+      storeFiles();
+    }
+  }, [files]);
+
+  // Modify handleCancel to clear IndexedDB
+  const handleCancel = async () => {
+    setFiles([]);
+    setUploading(false);
+    setProgress(0);
+    setError(null);
+    await fileStorage.clearFiles();
+    
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+      setPreviewOpen(false);
+    }
+  };
+
+  // Modify handleUpload to clear storage after successful upload
   const handleUpload = async () => {
     if (files.length === 0) return;
     
@@ -310,40 +364,23 @@ const UploadFilePage: React.FC = () => {
       setError(null);
       simulateProgress();
       
-      // In a real implementation, you would upload all files or use Promise.all
-      // For this example, we'll just upload the first file to match your existing API
       const result = await uploadDocument(files[0]);
       
-      // Complete the progress
       setProgress(100);
-      
-      // Show success
       setSuccess(true);
       
-      // Reset the form
+      // Clear files from IndexedDB after successful upload
+      await fileStorage.clearFiles();
+      
       setTimeout(() => {
         setFiles([]);
         setUploading(false);
-        // Navigate to documents list page or stay on the current page
-        // navigate('/documents');
       }, 2000);
       
     } catch (err) {
       setUploading(false);
       setProgress(0);
       setError(err instanceof Error ? err.message : 'An error occurred during upload');
-    }
-  };
-  
-  const handleCancel = () => {
-    setFiles([]);
-    setUploading(false);
-    setProgress(0);
-    setError(null);
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(null);
-      setPreviewOpen(false);
     }
   };
   
@@ -823,9 +860,9 @@ const UploadFilePage: React.FC = () => {
                       <Tooltip title="Remove">
                         <IconButton 
                           size="small"
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            handleRemoveFile(index);
+                            await handleRemoveFile(index);
                           }}
                           sx={{
                             color: theme.palette.error.main,
