@@ -3,7 +3,7 @@ import { Button, Stack, CircularProgress, alpha, useTheme } from '@mui/material'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CancelIcon from '@mui/icons-material/Cancel';
 import { motion } from 'framer-motion';
-import { UploadActionsProps } from '../../../types/fileUploadtypes';
+import { UploadActionsProps } from '../../types/fileUploadtypes';
 
 /**
  * Component for upload and cancel buttons

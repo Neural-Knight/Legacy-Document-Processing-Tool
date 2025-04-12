@@ -1,8 +1,8 @@
 import React from 'react';
 import { Box, Typography, LinearProgress, alpha, useTheme } from '@mui/material';
 import { motion } from 'framer-motion';
-import { UploadProgressProps } from '../../../types/fileUploadtypes';
-import { calculateOverallProgress } from '../../../utils/fileUploadutils';
+import { UploadProgressProps } from '../../types/fileUploadtypes';
+import { calculateOverallProgress } from '../../utils/fileUploadutils';
 
 /**
  * Component that displays overall upload progress

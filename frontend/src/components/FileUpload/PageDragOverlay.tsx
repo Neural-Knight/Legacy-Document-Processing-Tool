@@ -3,7 +3,7 @@ import { Box, Typography, alpha, useTheme } from '@mui/material';
 import { motion } from 'framer-motion';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { Fade } from '@mui/material';
-import { PageDragOverlayProps } from '../../../types/fileUploadtypes';
+import { PageDragOverlayProps } from '../../types/fileUploadtypes';
 
 /**
  * Full-screen overlay that appears when dragging files over the page

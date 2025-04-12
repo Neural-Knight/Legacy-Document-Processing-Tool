@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, IconButton, Fade } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { FilePreviewProps } from '../../../types/fileUploadtypes';
+import { FilePreviewProps } from '../../types/fileUploadtypes';
 
 /**
  * Modal component for previewing files

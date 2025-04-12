@@ -1,10 +1,10 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Alert, 
+import {
+  Box,
+  Typography,
+  Alert,
   Snackbar,
-  alpha, 
+  alpha,
   useTheme
 } from '@mui/material';
 import { motion } from 'framer-motion';
@@ -14,13 +14,12 @@ import { uploadDocument } from "../services/documentService"
 import { fileStorage } from '../utils/fileStorage'; // Adjust the import path as necessary
 
 // Import components
-import DragDropArea from '../components/layout/FileUpload/DragDropArea';
-import FileList from '../components/layout/FileUpload/FileList';
-import FilePreview from '../components/layout/FileUpload/FilePreview';
-import PageDragOverlay from '../components/layout/FileUpload/PageDragOverlay';
-import UploadProgress from '../components/layout/FileUpload/UploadProgress';
-import UploadActions from '../components/layout/FileUpload/UploadActions';
-
+import DragDropArea from '../components/FileUpload/DragDropArea';
+import FileList from '../components/FileUpload/FileList';
+import FilePreview from '../components/FileUpload/FilePreview';
+import PageDragOverlay from '../components/FileUpload/PageDragOverlay';
+import UploadProgress from '../components/FileUpload/UploadProgress';
+import UploadActions from '../components/FileUpload/UploadActions';
 // Import types and utilities
 import { FileUploadStatus } from '../types/fileUploadtypes';
 import { calculateOverallProgress, isAnyFileUploading } from '../utils/fileUploadutils';
@@ -44,15 +43,15 @@ const UploadPage: React.FC = () => {
   // Track individual file upload status
   const [fileStatuses, setFileStatuses] = useState<FileUploadStatus[]>([]);
   // const navigate = useNavigate();
-  
+
   const isDarkMode = theme.palette.mode === 'dark';
-  
+
   // Track mouse position for interactive background effects
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
   // Calculate overall progress
   const overallProgress = calculateOverallProgress(fileStatuses);
-  
+
   // Check if any file is currently uploading
   const uploadingAny = isAnyFileUploading(fileStatuses);
 
@@ -74,17 +73,17 @@ const UploadPage: React.FC = () => {
         cancelled: false
       };
     });
-    
+
     setFileStatuses(newStatuses);
   }, [files]);
 
   // Check for completed uploads and set global success
   useEffect(() => {
     // Check if all files have been processed (success or error)
-    const allProcessed = fileStatuses.every(status => 
+    const allProcessed = fileStatuses.every(status =>
       status.success || (status.error !== null) || status.cancelled
     );
-    
+
     // Set global success state if all files have been processed and at least one succeeded
     if (allProcessed && fileStatuses.some(status => status.success)) {
       setGlobalSuccess(true);
@@ -100,7 +99,7 @@ const UploadPage: React.FC = () => {
         setIsPageDragging(true);
       }
     };
-    
+
     const handlePageDragLeave = (e: DragEvent) => {
       e.preventDefault();
       setPageDragCounter(prev => prev - 1);
@@ -108,22 +107,22 @@ const UploadPage: React.FC = () => {
         setIsPageDragging(false);
       }
     };
-    
+
     const handlePageDragOver = (e: DragEvent) => {
       e.preventDefault();
     };
-    
+
     const handlePageDrop = (e: DragEvent) => {
       e.preventDefault();
       setIsPageDragging(false);
       setPageDragCounter(0);
     };
-    
+
     document.addEventListener('dragenter', handlePageDragEnter);
     document.addEventListener('dragleave', handlePageDragLeave);
     document.addEventListener('dragover', handlePageDragOver);
     document.addEventListener('drop', handlePageDrop);
-    
+
     return () => {
       document.removeEventListener('dragenter', handlePageDragEnter);
       document.removeEventListener('dragleave', handlePageDragLeave);
@@ -137,9 +136,9 @@ const UploadPage: React.FC = () => {
     const trackMouseMove = (e: MouseEvent) => {
       setMousePosition({ x: e.clientX, y: e.clientY });
     };
-    
+
     document.addEventListener('mousemove', trackMouseMove);
-    
+
     return () => {
       document.removeEventListener('mousemove', trackMouseMove);
     };
@@ -152,23 +151,23 @@ const UploadPage: React.FC = () => {
 
     const updateBackgroundEffect = () => {
       if (isDragging || uploadingAny) return;
-      
+
       const rect = dropArea.getBoundingClientRect();
-      
+
       // Calculate relative mouse position within the element
       const relativeX = mousePosition.x - rect.left;
       const relativeY = mousePosition.y - rect.top;
-      
+
       // Check if mouse is within the element bounds
       if (relativeX >= 0 && relativeX <= rect.width && relativeY >= 0 && relativeY <= rect.height) {
         const centerX = rect.width / 2;
         const centerY = rect.height / 2;
-        
+
         const xOffset = (relativeX - centerX) / centerX * 15;
         const yOffset = (relativeY - centerY) / centerY * 15;
-        
+
         dropArea.style.backgroundPosition = `${50 + xOffset}% ${50 + yOffset}%`;
-        
+
         // Subtle shadow movement
         const shadowX = xOffset / 5;
         const shadowY = yOffset / 5;
@@ -177,22 +176,22 @@ const UploadPage: React.FC = () => {
           : `0 10px 25px rgba(0,0,0,0.07), ${shadowX}px ${shadowY}px 15px rgba(0,0,0,0.05)`;
       }
     };
-    
+
     // Use requestAnimationFrame for smoother animation
     let animationFrameId: number;
-    
+
     const animate = () => {
       updateBackgroundEffect();
       animationFrameId = requestAnimationFrame(animate);
     };
-    
+
     animate();
-    
+
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
   }, [isDragging, uploadingAny, mousePosition, isDarkMode]);
-  
+
   // Simulate progress updates during processing for a specific file
   const simulateProgress = useCallback((fileIndex: number) => {
     // Start file upload simulation (0-50%)
@@ -200,44 +199,44 @@ const UploadPage: React.FC = () => {
       setFileStatuses(prevStatuses => {
         const newStatuses = [...prevStatuses];
         const statusIndex = newStatuses.findIndex(s => s.fileIndex === fileIndex);
-        
+
         if (statusIndex === -1 || newStatuses[statusIndex].progress >= 50 || !newStatuses[statusIndex].uploading) {
           clearInterval(uploadInterval);
           return prevStatuses;
         }
-        
+
         newStatuses[statusIndex] = {
           ...newStatuses[statusIndex],
           progress: newStatuses[statusIndex].progress + 1
         };
-        
+
         return newStatuses;
       });
     }, 50);
-    
+
     // After reaching 50%, simulate processing progress (50-100%)
     setTimeout(() => {
       const processInterval = setInterval(() => {
         setFileStatuses(prevStatuses => {
           const newStatuses = [...prevStatuses];
           const statusIndex = newStatuses.findIndex(s => s.fileIndex === fileIndex);
-          
+
           if (statusIndex === -1 || newStatuses[statusIndex].progress >= 95 || !newStatuses[statusIndex].uploading) {
             clearInterval(processInterval);
             return prevStatuses;
           }
-          
+
           newStatuses[statusIndex] = {
             ...newStatuses[statusIndex],
             progress: newStatuses[statusIndex].progress + 1
           };
-          
+
           return newStatuses;
         });
       }, 200);
     }, 2500);
   }, []);
-  
+
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -246,7 +245,7 @@ const UploadPage: React.FC = () => {
       setIsDragging(true);
     }
   };
-  
+
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -255,12 +254,12 @@ const UploadPage: React.FC = () => {
       setIsDragging(false);
     }
   };
-  
+
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
   };
-  
+
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -268,65 +267,65 @@ const UploadPage: React.FC = () => {
     setDragCounter(0);
     setIsPageDragging(false);
     setPageDragCounter(0);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFiles = Array.from(e.dataTransfer.files);
       validateAndAddFiles(droppedFiles);
     }
   };
-  
+
   const validateAndAddFiles = (newFiles: File[]) => {
     const validFiles: File[] = [];
     const errors: string[] = [];
-    
+
     // Set maximum file size to 50MB
     const MAX_FILE_SIZE = 50 * 1024 * 1024;
-    
+
     newFiles.forEach(file => {
       // Check file size limit
       if (file.size > MAX_FILE_SIZE) {
         errors.push(`${file.name} exceeds 50MB size limit`);
         return;
       }
-      
+
       // Check if file already exists in the list
-      const fileExists = files.some(f => 
-        f.name === file.name && 
-        f.size === file.size && 
+      const fileExists = files.some(f =>
+        f.name === file.name &&
+        f.size === file.size &&
         f.lastModified === file.lastModified
       );
-      
+
       if (fileExists) {
         errors.push(`${file.name} is already in the list`);
         return;
       }
-      
+
       validFiles.push(file);
     });
-    
+
     if (validFiles.length > 0) {
       setFiles(prev => [...prev, ...validFiles]);
       setGlobalError(null);
     }
-    
+
     if (errors.length > 0) {
       setGlobalError(errors.join('. '));
     }
   };
-  
+
   const handleFileSelect = () => {
     fileInputRef.current?.click();
   };
-  
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       validateAndAddFiles(Array.from(e.target.files));
     }
   };
-  
+
   const handleRemoveFile = async (index: number) => {
     const fileToRemove = files[index];
-    
+
     // Cancel upload if in progress
     if (fileStatuses[index]?.uploading) {
       setFileStatuses(prev => {
@@ -343,14 +342,14 @@ const UploadPage: React.FC = () => {
         return newStatuses;
       });
     }
-    
+
     // Remove file from list
     setFiles(prev => {
       const newFiles = [...prev];
       newFiles.splice(index, 1);
       return newFiles;
     });
-    
+
     // Update other files' indexes
     setFileStatuses(prev => {
       return prev
@@ -360,30 +359,30 @@ const UploadPage: React.FC = () => {
           fileIndex: status.fileIndex > index ? status.fileIndex - 1 : status.fileIndex
         }));
     });
-    
+
     try {
       await fileStorage.removeFile(fileToRemove);
     } catch (error) {
       console.error('Error removing file from storage:', error);
     }
-  
+
     // If removing the previewed file, close the preview
     if (previewUrl && index === files.findIndex(file => URL.createObjectURL(file) === previewUrl)) {
       handleClosePreview();
     }
   };
-  
+
   const handlePreviewFile = (file: File) => {
     // Clean up previous preview URL to avoid memory leaks
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
-    
+
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
     setPreviewOpen(true);
   };
-  
+
   const handleClosePreview = () => {
     setPreviewOpen(false);
     // Delay revoking the URL until after animation completes
@@ -407,7 +406,7 @@ const UploadPage: React.FC = () => {
         console.error('Error loading stored files:', error);
       }
     };
-    
+
     loadStoredFiles();
   }, []);
 
@@ -446,13 +445,13 @@ const UploadPage: React.FC = () => {
         });
       }
     });
-    
+
     setFiles([]);
     setFileStatuses([]);
     setGlobalError(null);
     setGlobalSuccess(false);
     await fileStorage.clearFiles();
-    
+
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
@@ -463,8 +462,8 @@ const UploadPage: React.FC = () => {
   // Upload a single file with progress tracking
   const uploadSingleFile = async (fileIndex: number) => {
     const file = files[fileIndex];
-    if (!file) return;
-    
+    if (!file) return { success: false, fileIndex };
+
     // Set file as uploading
     setFileStatuses(prev => {
       const newStatuses = [...prev];
@@ -481,10 +480,9 @@ const UploadPage: React.FC = () => {
       }
       return newStatuses;
     });
-    
+
     // Start progress simulation
     simulateProgress(fileIndex);
-    
     try {
       // Use the actual API with progress tracking
       const result = await uploadDocument(
@@ -504,7 +502,7 @@ const UploadPage: React.FC = () => {
           });
         }
       );
-      
+
       // Mark as complete
       setFileStatuses(prev => {
         const newStatuses = [...prev];
@@ -519,12 +517,14 @@ const UploadPage: React.FC = () => {
         }
         return newStatuses;
       });
-      
-      return result;
+      console.log("Upload result: ", result);
+
+      // Return success status with fileIndex
+      return { success: true, fileIndex };
     } catch (err) {
       // Handle error for this specific file
       const errorMessage = err instanceof Error ? err.message : 'An error occurred during upload';
-      
+
       setFileStatuses(prev => {
         const newStatuses = [...prev];
         const statusIndex = newStatuses.findIndex(s => s.fileIndex === fileIndex);
@@ -537,64 +537,71 @@ const UploadPage: React.FC = () => {
         }
         return newStatuses;
       });
-      
-      throw err;
+
+      return { success: false, fileIndex, error: errorMessage };
     }
   };
 
-  // Process all files in parallel
+  // Then modify handleUpload to use these results directly
   const handleUpload = async () => {
     if (files.length === 0) return;
-    
+
     // Reset global states
     setGlobalError(null);
     setGlobalSuccess(false);
-    
+
     // Process all files in parallel
     const uploadPromises = files.map((_, index) => {
       // Skip files that are already uploaded or have errors
       const status = fileStatuses.find(s => s.fileIndex === index);
       if (status?.success || status?.error) {
-        return Promise.resolve();
+        return Promise.resolve({ success: !!status.success, fileIndex: index });
       }
       return uploadSingleFile(index).catch(err => {
         console.error(`Error uploading file ${index}:`, err);
-        // We've already handled the error in uploadSingleFile
-        // Just catching here to prevent the Promise.all from failing completely
+        return { success: false, fileIndex: index, error: err };
       });
     });
-    
+
     try {
-      await Promise.all(uploadPromises);
-      
-      // Count successful uploads
-      const successCount = fileStatuses.filter(s => s.success).length;
-      
-      if (successCount > 0) {
+      const results = await Promise.all(uploadPromises);
+      const successfulUploads = results.filter(result => result.success);
+
+      console.log("Upload results:", results);
+      console.log("Successful uploads:", successfulUploads.length);
+
+      if (successfulUploads.length > 0) {
         // If we have at least one success, consider the overall operation successful
         setGlobalSuccess(true);
-        
-        // Remove successfully uploaded files from storage after a delay
-        setTimeout(async () => {
-          // Get indexes of successful files
-          const successIndexes = fileStatuses
-            .filter(s => s.success)
-            .map(s => s.fileIndex);
-          
-          // Update files state to remove successful files
-          setFiles(prev => prev.filter((_, i) => !successIndexes.includes(i)));
-          
+
+        // Get indexes of successful files
+        const successIndexes = successfulUploads.map(result => result.fileIndex);
+        console.log("SuccessIndexes:", successIndexes);
+
+        // Schedule cleanup
+        setTimeout(() => {
+          // Use functional updates to ensure we're working with the latest state
+          setFiles(prevFiles => {
+            const filesToKeep = prevFiles.filter((_, i) => !successIndexes.includes(i));
+
+            // Use an immediately invoked async function for storage operations
+            (async () => {
+              // Clear files from storage
+              await fileStorage.clearFiles();
+
+              // If any files remain, store them
+              if (filesToKeep.length > 0) {
+                await fileStorage.storeFiles(filesToKeep);
+              }
+            })();
+
+            return filesToKeep;
+          });
+
           // Update fileStatuses to remove successful files
-          setFileStatuses(prev => prev.filter(s => !successIndexes.includes(s.fileIndex)));
-          
-          // Clear files from storage
-          await fileStorage.clearFiles();
-          
-          // If any files remain, store them
-          if (files.length > successIndexes.length) {
-            const remainingFiles = files.filter((_, i) => !successIndexes.includes(i));
-            await fileStorage.storeFiles(remainingFiles);
-          }
+          setFileStatuses(prevStatuses =>
+            prevStatuses.filter(s => !successIndexes.includes(s.fileIndex))
+          );
         }, 2000);
       }
     } catch (err) {
@@ -606,25 +613,25 @@ const UploadPage: React.FC = () => {
   return (
     <Box sx={{ maxWidth: 1000, mx: 'auto', p: 4 }}>
       {/* Page-level drag overlay */}
-      <PageDragOverlay 
-        isPageDragging={isPageDragging} 
-        isDarkMode={isDarkMode} 
+      <PageDragOverlay
+        isPageDragging={isPageDragging}
+        isDarkMode={isDarkMode}
       />
-    
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <Typography 
-          variant="h4" 
-          component="h1" 
+        <Typography
+          variant="h4"
+          component="h1"
           gutterBottom
           sx={{
             position: 'relative',
             display: 'inline-block',
-            background: isDarkMode 
-              ? `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})` 
+            background: isDarkMode
+              ? `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`
               : theme.palette.primary.main,
             backgroundClip: 'text',
             WebkitBackgroundClip: 'text',
@@ -636,7 +643,7 @@ const UploadPage: React.FC = () => {
           Upload Documents
         </Typography>
       </motion.div>
-      
+
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -647,7 +654,7 @@ const UploadPage: React.FC = () => {
           The system will process your documents and extract relevant information.
         </Typography>
       </motion.div>
-      
+
       {/* Drag and drop area */}
       <DragDropArea
         isDragging={isDragging}
@@ -671,7 +678,7 @@ const UploadPage: React.FC = () => {
           multiple
         />
       </DragDropArea>
-      
+
       {/* File list */}
       <FileList
         files={files}
@@ -680,7 +687,7 @@ const UploadPage: React.FC = () => {
         handlePreviewFile={handlePreviewFile}
         isDarkMode={isDarkMode}
       />
-      
+
       {/* Upload actions */}
       <UploadActions
         files={files}
@@ -690,7 +697,7 @@ const UploadPage: React.FC = () => {
         handleCancel={handleCancel}
         isDarkMode={isDarkMode}
       />
-      
+
       {/* Upload progress */}
       <UploadProgress
         uploading={uploadingAny}
@@ -699,25 +706,25 @@ const UploadPage: React.FC = () => {
         files={files}
         isDarkMode={isDarkMode}
       />
-      
+
       {/* File preview */}
       <FilePreview
         previewOpen={previewOpen}
         previewUrl={previewUrl}
         handleClosePreview={handleClosePreview}
       />
-      
+
       {/* Notification snackbars */}
-      <Snackbar 
-        open={!!globalError} 
-        autoHideDuration={6000} 
+      <Snackbar
+        open={!!globalError}
+        autoHideDuration={6000}
         onClose={() => setGlobalError(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert 
-          severity="error" 
+        <Alert
+          severity="error"
           onClose={() => setGlobalError(null)}
-          sx={{ 
+          sx={{
             borderRadius: '10px',
             boxShadow: `0 8px 16px ${alpha(theme.palette.error.main, 0.24)}`
           }}
@@ -725,18 +732,18 @@ const UploadPage: React.FC = () => {
           {globalError}
         </Alert>
       </Snackbar>
-      
+
       <Snackbar
         open={globalSuccess}
         autoHideDuration={6000}
         onClose={() => setGlobalSuccess(false)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert 
-          severity="success" 
+        <Alert
+          severity="success"
           icon={<CheckCircleIcon fontSize="inherit" />}
           onClose={() => setGlobalSuccess(false)}
-          sx={{ 
+          sx={{
             borderRadius: '10px',
             boxShadow: `0 8px 16px ${alpha(theme.palette.success.main, 0.24)}`
           }}

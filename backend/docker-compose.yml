@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:14
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      - ./uploads:/app/uploads
+      - ./alembic:/app/alembic
+    environment:
+      - POSTGRES_SERVER=db  # This stays hardcoded as it needs to match the service name
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - STORAGE_TYPE=${STORAGE_TYPE:-local}
+      - LOCAL_STORAGE_PATH=${LOCAL_STORAGE_PATH:-./uploads}
+      - MAX_UPLOAD_SIZE=${MAX_UPLOAD_SIZE:-50}
+    command: >
+      bash -c "alembic upgrade head && 
+              uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  postgres_data:

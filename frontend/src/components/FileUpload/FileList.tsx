@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Typography, Paper, alpha, useTheme } from '@mui/material';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import { motion } from 'framer-motion';
-import { FileListProps } from '../../../types/fileUploadtypes';
+import { FileListProps } from '../../types/fileUploadtypes';
 import FileItem from './FileItem';
 
 /**

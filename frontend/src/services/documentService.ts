@@ -1,7 +1,6 @@
-// src/api/documents.ts
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = 'http://localhost:8000/api';
 
 export interface Document {
   id: string;
@@ -119,6 +118,27 @@ export const deleteDocument = async (id: string): Promise<void> => {
   }
 };
 
+
+/**
+ * Extract the original name from the stored filename (timestamp_originalName.pdf)
+ * @param filename The stored filename
+ * @returns The original filename
+ */
+const extractOriginalName = (filename: string): string => {
+  // Find the first underscore (which separates timestamp from original name)
+  const firstUnderscoreIndex = filename.indexOf('_');
+  
+  // If there's no underscore, return the filename as is
+  if (firstUnderscoreIndex === -1) {
+    return filename;
+  }
+  
+  // Return everything after the first underscore
+  return filename.substring(firstUnderscoreIndex + 1);
+};
+
+
+//-------------------------------------------------------------------------------------------------------
 /**
  * Download a document
  * @param filePath The path to the document file
@@ -202,20 +222,3 @@ export const getDocumentTables = async (id: string): Promise<TableData[] | Table
   }
 };
 
-/**
- * Extract the original name from the stored filename (timestamp_originalName.pdf)
- * @param filename The stored filename
- * @returns The original filename
- */
-const extractOriginalName = (filename: string): string => {
-  // Find the first underscore (which separates timestamp from original name)
-  const firstUnderscoreIndex = filename.indexOf('_');
-  
-  // If there's no underscore, return the filename as is
-  if (firstUnderscoreIndex === -1) {
-    return filename;
-  }
-  
-  // Return everything after the first underscore
-  return filename.substring(firstUnderscoreIndex + 1);
-};

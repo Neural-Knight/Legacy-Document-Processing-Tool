@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Typography, Paper, Button, alpha, useTheme, Fade } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { motion } from 'framer-motion';
-import { DragDropAreaProps } from '../../../types/fileUploadtypes';
+import { DragDropAreaProps } from '../../types/fileUploadtypes';
 
 /**
  * Component for the drag and drop upload area
