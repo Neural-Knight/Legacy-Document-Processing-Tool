@@ -79,7 +79,7 @@ class LocalStorageService(StorageService):
             return True
         return False
     
-    async def get_file(self, file_path: str) -> Optional[BinaryIO]:
+    async def get_file(self, file_path: str) -> Optional[BinaryIO]:  ## Not Needed
         """Get a file from local storage"""
         full_path = os.path.join(self.root_path, file_path)
         if os.path.exists(full_path):
@@ -151,7 +151,7 @@ class S3StorageService(StorageService):
             print(f"Error deleting from S3: {e}")
             return False
     
-    async def get_file(self, file_path: str) -> Optional[BinaryIO]:
+    async def get_file(self, file_path: str) -> Optional[BinaryIO]: ## Not Needed
         """Get a file from S3 storage"""
         try:
             response = self.s3_client.get_object(

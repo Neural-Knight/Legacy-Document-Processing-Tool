@@ -24,7 +24,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import FilePresentIcon from '@mui/icons-material/FilePresent';
 
 import { FileItemProps } from '../../types/fileUploadtypes';
-import { formatFileSize, getFileStatusText, getProgressColor } from '../../utils/fileUploadutils';
+import { formatFileSize, getFileStatusText, getProgressColor } from '../../utils/fileUploadUtils';
 
 /**
  * Component for displaying a single file item with its status

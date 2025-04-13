@@ -1,7 +1,9 @@
+import os
+import mimetypes
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from typing import List
 from sqlalchemy.orm import Session
-
+from fastapi.responses import StreamingResponse
 from app.db.session import get_db
 from app.services.storage_service import get_storage_service
 from app.crud.document import create_document, get_document, get_documents, delete_document
@@ -117,3 +119,44 @@ async def delete_document_by_id(
     
     # Delete document record from database
     delete_document(db, document_id)
+    
+    
+# Dowload a Document by ID
+@router.get('/documents/{document_id}/download')
+async def download_document(
+    document_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Download a document by ID
+    """
+    document = get_document(db, document_id)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    # Get file from storage
+    storage_service = get_storage_service()
+    file_content = await storage_service.get_file(document.file_path)
+    
+    if file_content is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found in storage"
+        )
+    # Ensure the file pointer is at the beginning
+    if(settings.STORAGE_TYPE=='local' and hasattr(file_content, "seek")):
+        file_content.seek(0)
+    
+    filename = os.path.basename(document.file_path)
+    content_type, _ = mimetypes.guess_type(filename)
+    if content_type is None:
+        content_type = "application/octet-stream"
+        
+    return StreamingResponse(
+        file_content,
+        media_type=content_type,
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )

@@ -19,7 +19,7 @@ import StorageIcon from '@mui/icons-material/Storage';
 const HomePage = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-
+  const isDarkMode = theme.palette.mode === 'dark';
   const features = [
     {
       title: 'My Documents',
@@ -62,8 +62,8 @@ Extract meaningful insights and get accurate answers with ease.',
             p: 5, 
             mb: 5, 
             borderRadius: '16px',
-            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
-            backdropFilter: 'blur(8px)',
+            background: isDarkMode? `linear-gradient(135deg, ${alpha(theme.palette.primary.dark, 0.4)} 0%, ${alpha(theme.palette.secondary.dark, 0.2)} 100%)`
+            : `linear-gradient(135deg, ${alpha(theme.palette.primary.light, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
             position: 'relative',
             overflow: 'hidden',
             border: `1px solid ${alpha(theme.palette.primary.main, 0.08)}`,
@@ -81,7 +81,7 @@ Extract meaningful insights and get accurate answers with ease.',
         >
           <Typography variant="h3" component="h1" gutterBottom sx={{ 
             fontWeight: 700,
-            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})` ,
+            background: isDarkMode?'linear-gradient(90deg, #fff 0%, #e0e0e0 100%)':theme.palette.primary.main ,
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             textShadow: '0 2px 10px rgba(0,0,0,0.05)',

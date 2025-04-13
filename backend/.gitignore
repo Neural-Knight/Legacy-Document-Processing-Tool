@@ -1,0 +1,78 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+.log/
+
+# Local development
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Database
+*.db
+*.sqlite3
+*.sqlite
+postgres_data/
+
+# FastAPI
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+.coverage.*
+
+# Uploaded files
+uploads/
+media/
+static/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Alembic
+alembic/*.pyc
+alembic/__pycache__/
+versions/__pycache__/

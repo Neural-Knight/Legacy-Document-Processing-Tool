@@ -6,7 +6,7 @@ import Layout from './components/layout/Layout';
 // Pages
 import HomePage from './pages/HomePage';
 import UploadPage from './pages/UploadPage';
-// import MyDocumentsPage from './pages/MyDocumentsPage';
+import MyDocumentsPage from './pages/MyDocumentsPage';
 import './App.css';
 
 function App () {
@@ -20,7 +20,7 @@ function App () {
             
             {/* Document Management */}
             <Route path="/upload" element={<UploadPage />} />
-            {/* <Route path="/documents" element={<MyDocumentsPage />} /> */}
+            <Route path="/documents" element={<MyDocumentsPage />} />
             
             {/* Data Analysis */}
             {/* <Route path="/visualizations" element={<VisualizationsPage />} />

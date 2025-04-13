@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.routes import uploads
+from app.api.routes import documents
 
 api_router = APIRouter()
-api_router.include_router(uploads.router, tags=["documents"])
+api_router.include_router(documents.router, tags=["documents"])

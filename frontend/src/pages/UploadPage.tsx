@@ -22,7 +22,7 @@ import UploadProgress from '../components/FileUpload/UploadProgress';
 import UploadActions from '../components/FileUpload/UploadActions';
 // Import types and utilities
 import { FileUploadStatus } from '../types/fileUploadtypes';
-import { calculateOverallProgress, isAnyFileUploading } from '../utils/fileUploadutils';
+import { calculateOverallProgress, isAnyFileUploading } from '../utils/fileUploadUtils';
 
 /**
  * Main component for the file upload page
@@ -631,11 +631,11 @@ const UploadPage: React.FC = () => {
             position: 'relative',
             display: 'inline-block',
             background: isDarkMode
-              ? `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`
+              ? 'linear-gradient(90deg, #fff 0%, #e0e0e0 100%)'
               : theme.palette.primary.main,
             backgroundClip: 'text',
             WebkitBackgroundClip: 'text',
-            // color: 'transparent',
+            color: 'transparent',
             fontWeight: 700,
             mb: 2
           }}
