@@ -418,7 +418,7 @@ const QueryAgent: React.FC = () => {
                         <Paper
                           elevation={1}
                           sx={{
-                            p: 2,
+                            p: 1,
                             borderRadius: '16px 16px 4px 16px',
                             backgroundColor: theme.palette.mode === 'dark' 
                               ? theme.palette.primary.dark
