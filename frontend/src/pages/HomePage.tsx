@@ -44,7 +44,7 @@ Transform information into insightful charts and graphs.",
 Extract meaningful insights and get accurate answers with ease.',
       icon: <StorageIcon fontSize="large" />,
       color: theme.palette.success.main,
-      path: '/query-tool',
+      path: '/query-agent',
       delay: 0.4
     },
   ];

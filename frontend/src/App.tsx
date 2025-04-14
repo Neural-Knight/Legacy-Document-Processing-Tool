@@ -7,6 +7,7 @@ import Layout from './components/layout/Layout';
 import HomePage from './pages/HomePage';
 import UploadPage from './pages/UploadPage';
 import MyDocumentsPage from './pages/MyDocumentsPage';
+import QueryAgentPage from './pages/QueryAgentPage';
 import './App.css';
 
 function App () {
@@ -23,8 +24,8 @@ function App () {
             <Route path="/documents" element={<MyDocumentsPage />} />
             
             {/* Data Analysis */}
-            {/* <Route path="/visualizations" element={<VisualizationsPage />} />
-            <Route path="/query-tool" element={<QueryToolPage />} /> */}
+            {/* <Route path="/visualizations" element={<VisualizationsPage />} /> */}
+            <Route path="/query-agent" element={<QueryAgentPage />} />
             
             {/* Error Handling */}
             {/* <Route path="/404" element={<NotFoundPage />} />

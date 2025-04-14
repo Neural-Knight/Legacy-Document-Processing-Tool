@@ -38,7 +38,7 @@ const navItems = [
   { text: 'Upload', path: '/upload', icon: <UploadIcon /> },
   { text: 'My Documents', path: '/documents', icon: <FolderIcon /> },
   { text: 'Visualizations', path: '/visualizations', icon: <BarChartIcon /> },
-  { text: 'Query Agent', path: '/query-tool', icon: <SmartToyIcon /> },
+  { text: 'Query Agent', path: '/query-agent', icon: <SmartToyIcon /> },
 ];
 
 // Fixed drawer width - slightly more spacious
