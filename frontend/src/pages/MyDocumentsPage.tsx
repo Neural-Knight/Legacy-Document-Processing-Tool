@@ -8,7 +8,6 @@ import {
   Typography, 
   Skeleton,
   alpha, 
-  CircularProgress,
   useTheme,
   Fade
 } from '@mui/material';

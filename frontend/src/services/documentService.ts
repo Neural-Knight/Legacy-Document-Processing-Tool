@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getOriginalName } from '../utils/documentHelpers';
 
 const API_URL = 'http://localhost:8000/api';
 
@@ -83,7 +84,7 @@ export const getDocumentById = async (id: string): Promise<Document> => {
     const response = await axios.get(`${API_URL}/documents/${numericId}`);
     return {
       ...response.data,
-      originalName: extractOriginalName(response.data.filename),
+      originalName: getOriginalName(response.data.filename),
     };
   } catch (error) {
     if (axios.isAxiosError(error) && error.response) {
@@ -123,26 +124,6 @@ export const deleteDocument = async (id: string): Promise<void> => {
     throw new Error('Failed to delete document');
   }
 };
-
-
-/**
- * Extract the original name from the stored filename (timestamp_originalName.pdf)
- * @param filename The stored filename
- * @returns The original filename
- */
-const extractOriginalName = (filename: string): string => {
-  // Find the first underscore (which separates timestamp from original name)
-  const firstUnderscoreIndex = filename.indexOf('_');
-  
-  // If there's no underscore, return the filename as is
-  if (firstUnderscoreIndex === -1) {
-    return filename;
-  }
-  
-  // Return everything after the first underscore
-  return filename.substring(firstUnderscoreIndex + 1);
-};
-
 
 //-------------------------------------------------------------------------------------------------------
 /**

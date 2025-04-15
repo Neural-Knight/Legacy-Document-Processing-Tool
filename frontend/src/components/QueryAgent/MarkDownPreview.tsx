@@ -17,7 +17,7 @@ const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content }) => {
     <Box sx={{ 
       '& a': { color: theme.palette.primary.main },
       '& code': { 
-        backgroundColor: theme.palette.grey[100],
+        backgroundColor: isDarkMode?theme.palette.grey[700]:theme.palette.grey[200],
         padding: '2px 4px',
         borderRadius: '4px'
       },
