@@ -333,6 +333,21 @@ const QueryAgent: React.FC = () => {
     const handleShareClick = () => {
         setShareDialogOpen(true);
     };
+    
+    // New handler for chat rename notifications
+    const handleChatRenamed = (renamedSession: ChatSession) => {
+        // Update the current session if it's the one being renamed
+        if (currentChatSession && currentChatSession.id === renamedSession.id) {
+            setCurrentChatSession(renamedSession);
+        }
+        
+        // Update the session in the open tabs
+        setOpenTabs(prev => 
+            prev.map(tab => 
+                tab.id === renamedSession.id ? renamedSession : tab
+            )
+        );
+    };
     // Add handlers for copy and edit functionality
     const handleCopy = (messageId: string, text: string) => {
         navigator.clipboard.writeText(text)
@@ -1496,6 +1511,7 @@ const QueryAgent: React.FC = () => {
                     onNewChat={handleNewChat}
                     currentChatId={currentChatSession?.id}
                     onChatDeleted={handleChatDeleted}
+                    onChatRenamed={handleChatRenamed}
                 />
             </Drawer>
 
