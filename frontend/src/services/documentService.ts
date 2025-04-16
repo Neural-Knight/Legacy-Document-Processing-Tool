@@ -1,7 +1,16 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { getOriginalName } from '../utils/documentHelpers';
+import { getAccessToken, isAuthenticated, refreshAuthToken } from '../services/authService';
 
 const API_URL = 'http://localhost:8000/api';
+
+// Define the structure of API error responses
+interface ApiErrorResponse {
+  detail?: string;
+  message?: string;
+  error?: string;
+  [key: string]: any; // Allow for any other properties
+}
 
 export interface Document {
   id: string;
@@ -13,7 +22,73 @@ export interface Document {
   processing_error?: string;
   file_size?: string;
   originalName?: string;
+  user_id: number; // Added to track document ownership
 }
+
+// Create an authenticated Axios instance
+const authApi = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add token to all requests
+authApi.interceptors.request.use(
+  (config) => {
+    const token = getAccessToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Handle authentication errors in responses
+authApi.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // If the error is due to an expired token
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        // Attempt token refresh
+        await refreshAuthToken();
+        
+        // Update the authorization header with the new token
+        const newToken = getAccessToken();
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        
+        // Retry the original request
+        return axios(originalRequest);
+      } catch (refreshError) {
+        // If refresh fails, let the error propagate
+        console.error('Authentication refresh failed:', refreshError);
+        return Promise.reject(error);
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
+// Helper function for consistent error handling
+const handleApiError = (error: unknown, defaultMessage: string): never => {
+  const axiosError = error as AxiosError<ApiErrorResponse>;
+  if (axiosError.response?.data) {
+    throw new Error(
+      axiosError.response.data.detail || 
+      axiosError.response.data.message || 
+      axiosError.response.data.error || 
+      defaultMessage
+    );
+  }
+  throw new Error(defaultMessage);
+};
 
 /**
  * Upload a document to the server
@@ -25,11 +100,15 @@ export const uploadDocument = async (
   file: File,
   onUploadProgress?: (progress: number) => void
 ): Promise<Document> => {
+  if (!isAuthenticated()) {
+    throw new Error('You must be logged in to upload documents');
+  }
+  
   const formData = new FormData();
   formData.append('file', file);
 
   try {
-    const response = await axios.post(`${API_URL}/upload`, formData, {
+    const response = await authApi.post<Document>('/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -45,26 +124,29 @@ export const uploadDocument = async (
     });
     return response.data;
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response) {
-      throw new Error(error.response.data.message || 'Failed to upload document');
-    }
-    throw new Error('Failed to upload document');
+    handleApiError(error, 'Failed to upload document');
+    throw new Error('Failed to upload document'); // This line is never reached but satisfies TypeScript
   }
 };
 
 /**
  * Get all documents
+ * @param ownedOnly Whether to return only the current user's documents (true) or all documents for admins (false)
  * @returns Promise with an array of documents
  */
-export const getAllDocuments = async (): Promise<Document[]> => {
+export const getAllDocuments = async (ownedOnly = true): Promise<Document[]> => {
+  if (!isAuthenticated()) {
+    throw new Error('You must be logged in to view documents');
+  }
+  
   try {
-    const response = await axios.get(`${API_URL}/documents`);
+    const response = await authApi.get<Document[]>('/documents', {
+      params: { owned_only: ownedOnly }
+    });
     return response.data;
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response) {
-      throw new Error(error.response.data.message || 'Failed to fetch documents');
-    }
-    throw new Error('Failed to fetch documents');
+    handleApiError(error, 'Failed to fetch documents');
+    throw new Error('Failed to fetch documents'); // This line is never reached but satisfies TypeScript
   }
 };
 
@@ -74,6 +156,10 @@ export const getAllDocuments = async (): Promise<Document[]> => {
  * @returns Promise with the document data
  */
 export const getDocumentById = async (id: string): Promise<Document> => {
+  if (!isAuthenticated()) {
+    throw new Error('You must be logged in to view documents');
+  }
+  
   try {
     const numericId = parseInt(id);
     
@@ -81,16 +167,15 @@ export const getDocumentById = async (id: string): Promise<Document> => {
       console.error(`Invalid document ID format: ${id}`);
       throw new Error('Invalid document ID format');
     }
-    const response = await axios.get(`${API_URL}/documents/${numericId}`);
+    
+    const response = await authApi.get<Document>(`/documents/${numericId}`);
     return {
       ...response.data,
       originalName: getOriginalName(response.data.filename),
     };
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response) {
-      throw new Error(error.response.data.message || 'Failed to fetch document');
-    }
-    throw new Error('Failed to fetch document');
+    handleApiError(error, 'Failed to fetch document');
+    throw new Error('Failed to fetch document'); // This line is never reached but satisfies TypeScript
   }
 };
 
@@ -100,11 +185,11 @@ export const getDocumentById = async (id: string): Promise<Document> => {
  * @returns Promise with the delete confirmation
  */
 export const deleteDocument = async (id: string): Promise<void> => {
+  if (!isAuthenticated()) {
+    throw new Error('You must be logged in to delete documents');
+  }
+  
   try {
-    console.log(`Attempting to delete document with ID: ${id}`);
-    
-    // Ensure we have a valid ID format - the backend expects a numeric ID
-    // This handles both string IDs ("123") and numeric IDs (123)
     const numericId = parseInt(id);
     
     if (isNaN(numericId)) {
@@ -112,22 +197,16 @@ export const deleteDocument = async (id: string): Promise<void> => {
       throw new Error('Invalid document ID format');
     }
     
-    const response = await axios.delete(`${API_URL}/documents/${numericId}`);
-    console.log('Delete response:', response.data);
-    return response.data;
+    await authApi.delete(`/documents/${numericId}`);
   } catch (error) {
-    console.error('Error in deleteDocument:', error);
-    if (axios.isAxiosError(error) && error.response) {
-      console.error('Response error:', error.response.data);
-      throw new Error(error.response.data.error || 'Failed to delete document');
-    }
-    throw new Error('Failed to delete document');
+    handleApiError(error, 'Failed to delete document');
+    throw new Error('Failed to delete document'); // This line is never reached but satisfies TypeScript
   }
 };
 
-//-------------------------------------------------------------------------------------------------------
 /**
  * Download a document
+ * @param id The document ID
  * @param filePath The path to the document file
  * @param filename The filename to save as
  * @param fileType The MIME type of the file (defaults to 'application/pdf')
@@ -138,15 +217,19 @@ export const downloadDocument = async (
   filename: string, 
   fileType: string = 'application/pdf'
 ): Promise<void> => {
+  if (!isAuthenticated()) {
+    throw new Error('You must be logged in to download documents');
+  }
+  
   try {
-    const response = await axios.get(`${API_URL}/documents/${id}/download`, {
+    const response = await authApi.get(`/documents/${id}/download`, {
       params: { filePath },
       responseType: 'blob',
     });
-    console.log('Download response:', response);
+    
     // Create a blob with the appropriate file type
     const blob = new Blob([response.data], { type: fileType });
-    console.log('Blob created:', blob);
+    
     // Create a link element to trigger the download
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -166,56 +249,7 @@ export const downloadDocument = async (
       window.URL.revokeObjectURL(url);
     }, 100);
   } catch (error) {
-    console.error('Download error:', error);
-    if (axios.isAxiosError(error) && error.response) {
-      throw new Error(error.response.data.message || 'Failed to download document');
-    }
-    throw new Error('Failed to download document');
+    handleApiError(error, 'Failed to download document');
+    throw new Error('Failed to download document'); // This line is never reached but satisfies TypeScript
   }
 };
-
-// // Define a type for table data
-// interface TableData {
-//   page_number: number;
-//   markdown_content: string;
-//   file_name: string;
-// }
-
-// // Define a type for tables response that can include an error
-// interface TablesResponse {
-//   error?: string;
-// }
-
-// /**
-//  * Get tables for a document
-//  * @param id The document ID
-//  * @returns Promise with the tables data or an error object
-//  */
-// export const getDocumentTables = async (id: string): Promise<TableData[] | TablesResponse> => {
-//   try {
-//     console.log(`API call: Fetching tables for document ID ${id}`);
-//     const response = await axios.get(`${API_URL}/documents/${id}/tables`);
-    
-//     // Check if the response is an array (success case)
-//     if (Array.isArray(response.data)) {
-//       return response.data;
-//     }
-    
-//     // If it's an error response with an 'error' field, pass it through
-//     if (response.data && typeof response.data === 'object' && 'error' in response.data) {
-//       return response.data as TablesResponse;
-//     }
-    
-//     // Unexpected format
-//     console.error('Unexpected response format:', response.data);
-//     return [];
-//   } catch (error) {
-//     console.error('Error in getDocumentTables:', error);
-//     if (axios.isAxiosError(error) && error.response) {
-//       // Return the error response so we can display it
-//       return { error: error.response.data.error || error.message || 'Failed to fetch tables' };
-//     }
-//     return { error: 'Failed to fetch tables' };
-//   }
-// };
-

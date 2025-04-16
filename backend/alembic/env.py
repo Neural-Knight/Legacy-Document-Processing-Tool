@@ -7,8 +7,9 @@ import sys
 # Add the app directory to the Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-# Import models to ensure they're discovered by Alembic
+# Import all models to ensure they're discovered by Alembic
 from app.models.document import Document
+from app.models.user import User, RefreshToken  # Add the new auth models
 from app.db.session import Base
 from app.core.config import settings
 
@@ -32,6 +33,9 @@ def run_migrations_offline():
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=True,       # Compare column types for changes
+        compare_server_default=True,  # Compare server defaults
+        render_as_batch=True,    # Generate batch migrations for SQLite support
     )
 
     with context.begin_transaction():
@@ -47,7 +51,11 @@ def run_migrations_online():
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection, 
+            target_metadata=target_metadata,
+            compare_type=True,       # Compare column types for changes
+            compare_server_default=True,  # Compare server defaults
+            render_as_batch=True,    # Generate batch migrations for SQLite support
         )
 
         with context.begin_transaction():

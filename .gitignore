@@ -74,6 +74,7 @@ frontend/pnpm-lock.yaml
 # Logs
 logs/
 *.log
+backend/logs/
 frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/yarn-error.log*
