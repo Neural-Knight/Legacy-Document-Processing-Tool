@@ -1,19 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Button, 
-  TextField, 
-  Typography, 
-  Paper, 
-  Link, 
-  FormControlLabel, 
+import {
+  Box,
+  Button,
+  TextField,
+  Typography,
+  Paper,
+  Link,
+  FormControlLabel,
   Checkbox,
   InputAdornment,
   IconButton,
   CircularProgress,
   Alert,
   useTheme,
-  alpha
+  alpha,
+  Snackbar,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle
 } from '@mui/material';
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -24,23 +30,28 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import CloseIcon from '@mui/icons-material/Close';
 
 const LoginPage: React.FC = () => {
   const theme = useTheme();
   const { login, error, isLoading, isAuthenticated, clearError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   // Form state
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  
+
   // Validation state
   const [usernameError, setUsernameError] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  
+
+  // Error dialog state
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+
   // Get the redirect path from location state or default to '/'
   const from = (location.state as any)?.from?.pathname || '/';
 
@@ -63,6 +74,13 @@ const LoginPage: React.FC = () => {
     clearError?.();
   }, [clearError]);
 
+  // Show error dialog when error occurs
+  useEffect(() => {
+    if (error) {
+      setErrorDialogOpen(true);
+    }
+  }, [error]);
+
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
@@ -72,7 +90,7 @@ const LoginPage: React.FC = () => {
 
   const validateForm = (): boolean => {
     let valid = true;
-    
+
     // Username/Email validation
     if (!username) {
       setUsernameError('Email or username is required');
@@ -80,7 +98,7 @@ const LoginPage: React.FC = () => {
     } else {
       setUsernameError('');
     }
-    
+
     // Password validation
     if (!password) {
       setPasswordError('Password is required');
@@ -91,24 +109,23 @@ const LoginPage: React.FC = () => {
     } else {
       setPasswordError('');
     }
-    
+
     return valid;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
-    
     // Create login credentials object for the new auth system
     const credentials: LoginCredentials = {
       username: username,
       password: password,
       remember_me: rememberMe
     };
-    
+
     const success = await login(credentials);
     if (success) {
       navigate(from, { replace: true });
@@ -119,8 +136,13 @@ const LoginPage: React.FC = () => {
     setShowPassword(!showPassword);
   };
 
+  const handleCloseErrorDialog = () => {
+    setErrorDialogOpen(false);
+    clearError?.();
+  };
+
   return (
-    <Box 
+    <Box
       sx={{
         minHeight: '100vh',
         display: 'flex',
@@ -155,18 +177,18 @@ const LoginPage: React.FC = () => {
         }
       }}
     >
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          width: '100%', 
-          justifyContent: 'center', 
+      <Box
+        sx={{
+          display: 'flex',
+          width: '100%',
+          justifyContent: 'center',
           alignItems: 'center',
           position: 'relative',
           zIndex: 1
         }}
       >
-        <Paper 
-          elevation={6} 
+        <Paper
+          elevation={6}
           sx={{
             width: '100%',
             maxWidth: 480,
@@ -174,7 +196,7 @@ const LoginPage: React.FC = () => {
             mx: 2,
             borderRadius: 3,
             backdropFilter: 'blur(10px)',
-            backgroundColor: theme.palette.mode === 'light' 
+            backgroundColor: theme.palette.mode === 'light'
               ? alpha(theme.palette.background.paper, 0.9)
               : alpha(theme.palette.background.paper, 0.8),
             transition: 'transform 0.3s, box-shadow 0.3s',
@@ -184,9 +206,9 @@ const LoginPage: React.FC = () => {
           }}
         >
           <Box sx={{ textAlign: 'center', mb: 5 }}>
-            <Typography 
-              variant="h4" 
-              component="h1" 
+            <Typography
+              variant="h4"
+              component="h1"
               gutterBottom
               sx={{ fontWeight: 700 }}
             >
@@ -197,12 +219,6 @@ const LoginPage: React.FC = () => {
             </Typography>
           </Box>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
-            </Alert>
-          )}
-          
           <Box component="form" onSubmit={handleSubmit} noValidate>
             <TextField
               margin="normal"
@@ -226,7 +242,7 @@ const LoginPage: React.FC = () => {
               }}
               sx={{ mb: 3 }}
             />
-            
+
             <TextField
               margin="normal"
               required
@@ -260,11 +276,11 @@ const LoginPage: React.FC = () => {
               }}
               sx={{ mb: 1 }}
             />
-            
+
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap' }}>
               <FormControlLabel
                 control={
-                  <Checkbox 
+                  <Checkbox
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
                     color="primary"
@@ -272,10 +288,10 @@ const LoginPage: React.FC = () => {
                 }
                 label="Remember me"
               />
-              
-              <Link 
-                component={RouterLink} 
-                to="/forgot-password" 
+
+              <Link
+                component={RouterLink}
+                to="/forgot-password"
                 variant="body2"
                 sx={{
                   color: theme.palette.primary.main,
@@ -289,15 +305,15 @@ const LoginPage: React.FC = () => {
                 Forgot password?
               </Link>
             </Box>
-            
+
             <Button
               type="submit"
               fullWidth
               variant="contained"
               size="large"
               disabled={isLoading}
-              sx={{ 
-                py: 1.5, 
+              sx={{
+                py: 1.5,
                 mb: 3,
                 position: 'relative',
                 '&.Mui-disabled': {
@@ -322,13 +338,13 @@ const LoginPage: React.FC = () => {
                 'Sign In'
               )}
             </Button>
-            
+
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="body2" color="textSecondary">
                 Don't have an account?{' '}
-                <Link 
-                  component={RouterLink} 
-                  to="/signup" 
+                <Link
+                  component={RouterLink}
+                  to="/signup"
                   sx={{
                     color: theme.palette.primary.main,
                     textDecoration: 'none',
@@ -345,7 +361,154 @@ const LoginPage: React.FC = () => {
           </Box>
         </Paper>
       </Box>
-    </Box>
+      {/* Error Dialog */}
+      <Dialog
+        open={errorDialogOpen}
+        onClose={handleCloseErrorDialog}
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            maxWidth: 380,
+            overflow: 'hidden',
+            position: 'relative'
+          }
+        }}
+      >
+        <IconButton
+          aria-label="close"
+          onClick={handleCloseErrorDialog}
+          sx={{
+            position: 'absolute',
+            right: 8,
+            top: 8,
+            color: theme.palette.grey[500],
+            zIndex: 2
+          }}
+        >
+          <CloseIcon />
+        </IconButton>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            p: 3,
+            pt: 4
+          }}
+        >
+          {/* Top error indicator bar */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 4,
+              background: `linear-gradient(90deg, ${theme.palette.error.main} 0%, ${theme.palette.error.light} 100%)`
+            }}
+          />
+
+          {/* Error icon with centered pulsing animation */}
+          <Box
+            sx={{
+              position: 'relative',
+              mb: 3,
+              width: 80,
+              height: 80,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            {/* Pulsing circle background */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '100%',
+                height: '100%',
+                borderRadius: '50%',
+                backgroundColor: alpha(theme.palette.error.main, 0.1),
+                animation: 'pulse 2s ease-in-out infinite',
+                '@keyframes pulse': {
+                  '0%': {
+                    transform: 'translate(-50%, -50%) scale(0.95)',
+                    opacity: 0.8,
+                  },
+                  '70%': {
+                    transform: 'translate(-50%, -50%) scale(1.1)',
+                    opacity: 0,
+                  },
+                  '100%': {
+                    transform: 'translate(-50%, -50%) scale(0.95)',
+                    opacity: 0,
+                  },
+                },
+              }}
+            />
+
+            {/* Error Icon */}
+            <ErrorOutlineIcon
+              sx={{
+                fontSize: 40,
+                color: theme.palette.error.main,
+                zIndex: 1,
+              }}
+            />
+          </Box>
+
+          {/* Error message content */}
+          <Typography
+            variant="h6"
+            gutterBottom
+            sx={{
+              fontWeight: 600,
+              textAlign: 'center',
+              color: theme.palette.error.main,
+              mb: 1
+            }}
+          >
+            Authentication Failed
+          </Typography>
+
+          <Typography
+            variant="body2"
+            sx={{
+              textAlign: 'center',
+              color: theme.palette.text.secondary,
+              mb: 3,
+              maxWidth: '280px'
+            }}
+          >
+            {error}
+          </Typography>
+
+          {/* Action button */}
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={handleCloseErrorDialog}
+            sx={{
+              bgcolor: theme.palette.error.main,
+              py: 1.5,
+              '&:hover': {
+                bgcolor: theme.palette.error.dark,
+              },
+              boxShadow: `0 4px 12px ${alpha(theme.palette.error.main, 0.2)}`,
+              transition: 'all 0.2s ease-in-out',
+              '&:active': {
+                transform: 'scale(0.98)'
+              }
+            }}
+          >
+            Try Again
+          </Button>
+        </Box>
+      </Dialog>
+
+    </Box >
   );
 };
 

@@ -750,7 +750,7 @@ const LandingPage: React.FC = () => {
           background: theme.palette.mode === 'light'
             ? `linear-gradient(135deg, ${alpha(theme.palette.primary.light, 0.15)} 0%, ${alpha(theme.palette.secondary.light, 0.15)} 100%)`
             : `linear-gradient(135deg, ${alpha(theme.palette.primary.dark, 0.2)} 0%, ${alpha(theme.palette.secondary.dark, 0.2)} 100%)`,
-          borderRadius: { md: '80px 0 0 0' },
+          borderRadius: { md: '80px 80px 0 0' },
           overflow: 'hidden',
           position: 'relative',
           '&::before': {

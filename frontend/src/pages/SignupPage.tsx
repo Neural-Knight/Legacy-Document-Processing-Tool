@@ -14,7 +14,12 @@ import {
   Checkbox,
   useTheme,
   alpha,
-  LinearProgress
+  LinearProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle
 } from '@mui/material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -28,6 +33,8 @@ import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import CloseIcon from '@mui/icons-material/Close';
 
 // Password strength indicator component
 const PasswordStrengthIndicator: React.FC<{ password: string }> = ({ password }) => {
@@ -206,10 +213,20 @@ const SignupPage: React.FC = () => {
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
   const [termsError, setTermsError] = useState('');
 
+  // Error dialog state
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+
   // Clear any previous auth errors when component mounts
   useEffect(() => {
     clearError?.();
   }, [clearError]);
+
+  // Show error dialog when error occurs
+  useEffect(() => {
+    if (error) {
+      setErrorDialogOpen(true);
+    }
+  }, [error]);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -339,6 +356,11 @@ const SignupPage: React.FC = () => {
     }
   };
 
+  const handleCloseErrorDialog = () => {
+    setErrorDialogOpen(false);
+    clearError?.();
+  };
+
   return (
     <Box 
       sx={{
@@ -417,12 +439,6 @@ const SignupPage: React.FC = () => {
               Join our platform and start managing your documents
             </Typography>
           </Box>
-
-          {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
-            </Alert>
-          )}
           
           <Box component="form" onSubmit={handleSubmit} noValidate>
             <TextField
@@ -677,6 +693,52 @@ const SignupPage: React.FC = () => {
           </Box>
         </Paper>
       </Box>
+
+      {/* Error Dialog */}
+      <Dialog
+        open={errorDialogOpen}
+        onClose={handleCloseErrorDialog}
+        aria-labelledby="signup-error-dialog-title"
+        aria-describedby="signup-error-dialog-description"
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            maxWidth: 400
+          }
+        }}
+      >
+        <DialogTitle 
+          id="signup-error-dialog-title"
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1,
+            bgcolor: theme.palette.error.main,
+            color: theme.palette.error.contrastText,
+            py: 2
+          }}
+        >
+          <ErrorOutlineIcon />
+          <Typography variant="h6" component="span">
+            Registration Failed
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <DialogContentText id="signup-error-dialog-description">
+            {error}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button 
+            onClick={handleCloseErrorDialog} 
+            color="primary" 
+            variant="contained"
+            fullWidth
+          >
+            Try Again
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
