@@ -54,7 +54,7 @@ const DocumentsHeader: React.FC = () => {
               mb: 1,
               background: theme.palette.mode === 'dark'
                 ? 'linear-gradient(90deg, #fff 0%, #e0e0e0 100%)'
-                : theme.palette.primary.main,
+                : 'black',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               textShadow: theme.palette.mode === 'dark' ? '0 0 8px rgba(255,255,255,0.1)' : 'none',

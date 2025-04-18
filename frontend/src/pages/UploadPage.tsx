@@ -632,7 +632,7 @@ const UploadPage: React.FC = () => {
             display: 'inline-block',
             background: isDarkMode
               ? 'linear-gradient(90deg, #fff 0%, #e0e0e0 100%)'
-              : theme.palette.primary.main,
+              : 'black',
             backgroundClip: 'text',
             WebkitBackgroundClip: 'text',
             color: 'transparent',

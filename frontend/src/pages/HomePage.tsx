@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Card, 
-  CardContent, 
-  Button, 
-  List, 
-  ListItem, 
-  ListItemIcon, 
-  ListItemText, 
-  ListItemSecondaryAction, 
-  IconButton, 
-  Chip, 
-  useTheme, 
-  alpha, 
-  Paper, 
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  Button,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  ListItemSecondaryAction,
+  IconButton,
+  Chip,
+  useTheme,
+  alpha,
+  Paper,
   Skeleton,
   CircularProgress,
   LinearProgress,
@@ -65,14 +65,14 @@ import DoNotDisturbIcon from '@mui/icons-material/DoNotDisturb';
 
 // Services
 import { getAllDocuments, Document } from '../services/documentService';
-import { getAllChatSessions} from '../services/chatStorageService';
+import { getAllChatSessions } from '../services/chatStorageService';
 
 // Types
 import { ChatSession } from '../types/chat';
 // Helpers
-import { 
-  getDocumentIcon, 
-  formatFileSize, 
+import {
+  getDocumentIcon,
+  formatFileSize,
   getOriginalName,
   isProcessed,
   getStatusIcon
@@ -98,9 +98,9 @@ import { useAuth } from '../context/AuthContext';
 // Animation variants for framer-motion
 const containerVariants = {
   hidden: { opacity: 0 },
-  visible: { 
+  visible: {
     opacity: 1,
-    transition: { 
+    transition: {
       staggerChildren: 0.1,
       delayChildren: 0.2
     }
@@ -109,15 +109,15 @@ const containerVariants = {
 
 const itemVariants = {
   hidden: { y: 20, opacity: 0 },
-  visible: { 
-    y: 0, 
+  visible: {
+    y: 0,
     opacity: 1,
     transition: { type: 'spring', stiffness: 100 }
   }
 };
 
 // New types for added features
-import{
+import {
   StorageInfo,
   type SystemStatus,
   ProcessingEvent,
@@ -340,11 +340,11 @@ const mockServices = {
 // Component for animated counter
 const AnimatedCounter: React.FC<{ value: number, duration?: number }> = ({ value, duration = 1 }) => {
   const [count, setCount] = useState(0);
-  
+
   useEffect(() => {
     // Reset count when value changes
     setCount(0);
-    
+
     if (value === 0) return;
 
     const steps = 20; // Number of steps to reach the final value
@@ -361,12 +361,12 @@ const AnimatedCounter: React.FC<{ value: number, duration?: number }> = ({ value
         setCount(Math.floor(increment * currentStep));
       }
     }, stepDuration);
-    
+
     return () => {
       clearInterval(timer);
     };
   }, [value, duration]);
-  
+
   return <>{count}</>;
 };
 
@@ -380,7 +380,7 @@ const StatCard: React.FC<{
   animate?: boolean;
 }> = ({ title, value, icon, color, isLoading, animate = true }) => {
   const theme = useTheme();
-  
+
   return (
     <Card
       component={motion.div}
@@ -418,14 +418,14 @@ const StatCard: React.FC<{
             {icon}
           </Box>
         </Box>
-        
+
         {isLoading ? (
           <Skeleton variant="rectangular" width="60%" height={40} sx={{ mb: 1 }} />
         ) : (
-          <Typography 
-            variant="h4" 
-            sx={{ 
-              fontWeight: 700, 
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 700,
               mb: 0,
               color: theme.palette.text.primary
             }}
@@ -451,12 +451,12 @@ const ActivityItem: React.FC<{
   onClick?: () => void;
 }> = ({ primary, secondary, icon, timestamp, onClick }) => {
   const theme = useTheme();
-  
+
   return (
-    <ListItem 
-      alignItems="flex-start" 
-      sx={{ 
-        py: 1.5, 
+    <ListItem
+      alignItems="flex-start"
+      sx={{
+        py: 1.5,
         px: 2,
         borderRadius: 2,
         mb: 1,
@@ -488,15 +488,15 @@ const ActivityItem: React.FC<{
         }
       />
       <ListItemSecondaryAction>
-        <Chip 
-          size="small" 
-          label={timestamp} 
-          sx={{ 
+        <Chip
+          size="small"
+          label={timestamp}
+          sx={{
             backgroundColor: alpha(theme.palette.primary.main, 0.1),
             color: theme.palette.text.secondary,
             fontWeight: 500,
             fontSize: '0.7rem'
-          }} 
+          }}
         />
       </ListItemSecondaryAction>
     </ListItem>
@@ -512,13 +512,13 @@ const ActionButton: React.FC<{
   onClick: () => void;
 }> = ({ title, description, icon, color, onClick }) => {
   const theme = useTheme();
-  
+
   return (
-    <Card 
-      component={motion.div} 
+    <Card
+      component={motion.div}
       variants={itemVariants}
-      sx={{ 
-        mb: 2, 
+      sx={{
+        mb: 2,
         cursor: 'pointer',
         borderRadius: 3,
         transition: 'all 0.3s ease',
@@ -576,18 +576,18 @@ const DocumentCard: React.FC<{
   const theme = useTheme();
   const originalName = getOriginalName(document.filename);
   const processed = isProcessed(document);
-  
+
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onToggleFavorite) {
       onToggleFavorite(document.id, !isFavorite);
     }
   };
-  
+
   return (
-    <Card 
-      sx={{ 
-        mb: 1, 
+    <Card
+      sx={{
+        mb: 1,
         cursor: 'pointer',
         borderRadius: 2,
         transition: 'all 0.2s ease',
@@ -599,8 +599,8 @@ const DocumentCard: React.FC<{
       onClick={onClick}
     >
       <CardContent sx={{ display: 'flex', alignItems: 'center', p: 2, '&:last-child': { pb: 2 } }}>
-        <Avatar sx={{ 
-          bgcolor: alpha(theme.palette.primary.main, 0.1), 
+        <Avatar sx={{
+          bgcolor: alpha(theme.palette.primary.main, 0.1),
           color: theme.palette.primary.main,
           mr: 2,
           width: 40,
@@ -616,29 +616,29 @@ const DocumentCard: React.FC<{
             <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
               {formatFileSize(document.file_size || '0')}
             </Typography>
-            <Chip 
-              size="small" 
+            <Chip
+              size="small"
               icon={typeof getStatusIcon(document, theme) === 'object' ? getStatusIcon(document, theme) as React.ReactElement : undefined}
-              label={processed ? 'Processed' : document.processing_error ? 'Error' : 'Processing'} 
-              sx={{ 
+              label={processed ? 'Processed' : document.processing_error ? 'Error' : 'Processing'}
+              sx={{
                 height: 20,
                 '& .MuiChip-label': { px: 1, fontSize: '0.65rem' },
                 '& .MuiChip-icon': { ml: 0.5, fontSize: '0.8rem' },
-                backgroundColor: processed 
+                backgroundColor: processed
                   ? alpha(theme.palette.success.main, 0.1)
                   : document.processing_error
                     ? alpha(theme.palette.error.main, 0.1)
                     : alpha(theme.palette.warning.main, 0.1),
-                color: processed 
+                color: processed
                   ? theme.palette.success.main
                   : document.processing_error
                     ? theme.palette.error.main
                     : theme.palette.warning.main,
-              }} 
+              }}
             />
           </Box>
         </Box>
-        <IconButton 
+        <IconButton
           size="small"
           onClick={handleFavoriteClick}
           sx={{
@@ -661,20 +661,20 @@ const SectionHeader: React.FC<{
   action?: React.ReactNode;
 }> = ({ title, action }) => {
   const theme = useTheme();
-  
+
   return (
-    <Box 
-      sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
+    <Box
+      sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
         alignItems: 'center',
         mb: 2
       }}
     >
-      <Typography 
-        variant="h6" 
+      <Typography
+        variant="h6"
         component="div" // Changed from h2 to div since we might have complex ReactNode
-        sx={{ 
+        sx={{
           fontWeight: 600,
           position: 'relative',
           '&::after': {
@@ -714,7 +714,7 @@ const LoadingWrapper: React.FC<{
       </Box>
     );
   }
-  
+
   if (error) {
     return (
       <Box sx={{ p: 3, textAlign: 'center' }}>
@@ -725,7 +725,7 @@ const LoadingWrapper: React.FC<{
       </Box>
     );
   }
-  
+
   return <>{children}</>;
 };
 
@@ -733,7 +733,7 @@ const LoadingWrapper: React.FC<{
 const CircularProgressWithLabel: React.FC<CircularProgressProps & { value: number, label: string, warning?: boolean }> = (props) => {
   const { value, label, warning = false, ...other } = props;
   const theme = useTheme();
-  
+
   return (
     <Box sx={{ position: 'relative', display: 'inline-flex' }}>
       <CircularProgress
@@ -778,7 +778,7 @@ const StorageUsage: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
   const theme = useTheme();
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
+
   useEffect(() => {
     const fetchStorageData = async () => {
       try {
@@ -789,14 +789,14 @@ const StorageUsage: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
         setError(err.message || 'Failed to load storage information');
       }
     };
-    
+
     if (!isLoading) {
       fetchStorageData();
     }
   }, [isLoading]);
-  
+
   const isNearCapacity = storageInfo ? storageInfo.percentage >= 80 : false;
-  
+
   return (
     <Card
       component={motion.div}
@@ -805,7 +805,7 @@ const StorageUsage: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
         height: '100%',
         borderRadius: 3,
         boxShadow: `0 4px 20px rgba(0,0,0,0.05)`,
-        border: isNearCapacity 
+        border: isNearCapacity
           ? `1px solid ${alpha(theme.palette.warning.main, 0.3)}`
           : `1px solid ${alpha(theme.palette.divider, 0.1)}`,
         overflow: 'hidden'
@@ -813,27 +813,27 @@ const StorageUsage: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
     >
       <CardContent sx={{ p: 3 }}>
         <SectionHeader title="Storage Usage" />
-        
+
         <LoadingWrapper loading={isLoading} error={error}>
           {storageInfo && (
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <CircularProgressWithLabel 
-                value={storageInfo.percentage} 
-                label="Used" 
+              <CircularProgressWithLabel
+                value={storageInfo.percentage}
+                label="Used"
                 warning={isNearCapacity}
               />
-              
+
               <Box sx={{ mt: 2, width: '100%', textAlign: 'center' }}>
                 <Typography variant="body1" sx={{ mb: 1, fontWeight: 500 }}>
                   {storageInfo.usedFormatted} of {storageInfo.totalFormatted}
                 </Typography>
-                
+
                 {isNearCapacity && (
-                  <Alert 
-                    severity="warning" 
+                  <Alert
+                    severity="warning"
                     icon={<WarningIcon fontSize="inherit" />}
-                    sx={{ 
-                      borderRadius: 2, 
+                    sx={{
+                      borderRadius: 2,
                       '& .MuiAlert-icon': { alignItems: 'center' }
                     }}
                   >
@@ -841,11 +841,11 @@ const StorageUsage: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
                     Consider removing unused documents or upgrading your plan.
                   </Alert>
                 )}
-                
-                <Button 
-                  variant="outlined" 
-                  size="small" 
-                  startIcon={<SettingsIcon />} 
+
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<SettingsIcon />}
                   sx={{ mt: 2, borderRadius: 2 }}
                 >
                   Manage Storage
@@ -865,7 +865,7 @@ const DocumentTimeline: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
   const navigate = useNavigate();
   const [processingEvents, setProcessingEvents] = useState<ProcessingEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
-  
+
   useEffect(() => {
     const fetchTimelineData = async () => {
       try {
@@ -876,7 +876,7 @@ const DocumentTimeline: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
         setError(err.message || 'Failed to load processing history');
       }
     };
-    
+
     if (!isLoading) {
       fetchTimelineData();
     }
@@ -913,7 +913,7 @@ const DocumentTimeline: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
         return <InfoOutlinedIcon />;
     }
   };
-  
+
   return (
     <Card
       component={motion.div}
@@ -927,11 +927,11 @@ const DocumentTimeline: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
       }}
     >
       <CardContent sx={{ p: 3 }}>
-        <SectionHeader 
-          title="Processing Timeline" 
+        <SectionHeader
+          title="Processing Timeline"
           action={
-            <Button 
-              size="small" 
+            <Button
+              size="small"
               endIcon={<ArrowForwardIcon />}
               sx={{ textTransform: 'none' }}
               onClick={() => navigate('/documents')}
@@ -940,7 +940,7 @@ const DocumentTimeline: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
             </Button>
           }
         />
-        
+
         <LoadingWrapper loading={isLoading} error={error}>
           {processingEvents.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -950,11 +950,11 @@ const DocumentTimeline: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
               </Typography>
             </Box>
           ) : (
-            <Timeline 
+            <Timeline
               position="alternate"
-              sx={{ 
-                p: 0, 
-                m: 0, 
+              sx={{
+                p: 0,
+                m: 0,
                 [`& .MuiTimelineItem-root:before`]: {
                   flex: 0,
                   padding: 0
@@ -975,9 +975,9 @@ const DocumentTimeline: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
                     <TimelineConnector />
                   </TimelineSeparator>
                   <TimelineContent>
-                    <Card 
-                      sx={{ 
-                        p: 1.5, 
+                    <Card
+                      sx={{
+                        p: 1.5,
                         borderRadius: 2,
                         boxShadow: `0 2px 8px ${alpha(getStatusColor(event.status), 0.15)}`,
                         border: `1px solid ${alpha(getStatusColor(event.status), 0.2)}`,
@@ -995,9 +995,9 @@ const DocumentTimeline: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
                           {event.details}
                         </Typography>
                       )}
-                      <Button 
-                        size="small" 
-                        variant="text" 
+                      <Button
+                        size="small"
+                        variant="text"
                         sx={{ fontSize: '0.75rem', mt: 0.5, p: 0, minWidth: 0 }}
                         onClick={() => navigate(`/documents/${event.documentId}`)}
                       >
@@ -1020,7 +1020,7 @@ const SystemStatus: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
   const theme = useTheme();
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
+
   useEffect(() => {
     const fetchSystemStatus = async () => {
       try {
@@ -1031,7 +1031,7 @@ const SystemStatus: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
         setError(err.message || 'Failed to load system status');
       }
     };
-    
+
     if (!isLoading) {
       fetchSystemStatus();
     }
@@ -1100,7 +1100,7 @@ const SystemStatus: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
         };
     }
   };
-  
+
   return (
     <Card
       component={motion.div}
@@ -1115,23 +1115,23 @@ const SystemStatus: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
     >
       <CardContent sx={{ p: 3 }}>
         <SectionHeader title="System Status" />
-        
+
         <LoadingWrapper loading={isLoading} error={error}>
           {systemStatus && (
             <>
               {/* Overall Status */}
-              <Box 
-                sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  p: 2, 
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  p: 2,
                   borderRadius: 2,
                   bgcolor: alpha(getOverallStatusDetails(systemStatus.overall).color, 0.1),
                   mb: 2
                 }}
               >
-                <Box 
-                  sx={{ 
+                <Box
+                  sx={{
                     mr: 2,
                     display: 'flex',
                     alignItems: 'center',
@@ -1154,14 +1154,14 @@ const SystemStatus: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
                   </Typography>
                 </Box>
               </Box>
-              
+
               {/* Maintenance Notice */}
               {systemStatus.maintenanceNotice?.active && (
-                <Alert 
-                  severity="info" 
-                  sx={{ 
-                    mb: 2, 
-                    borderRadius: 2 
+                <Alert
+                  severity="info"
+                  sx={{
+                    mb: 2,
+                    borderRadius: 2
                   }}
                 >
                   <AlertTitle>Scheduled Maintenance</AlertTitle>
@@ -1173,18 +1173,18 @@ const SystemStatus: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
                   )}
                 </Alert>
               )}
-              
+
               {/* Component Status */}
               <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
                 Component Status
               </Typography>
               <Stack spacing={1} sx={{ mb: 2 }}>
                 {Object.entries(systemStatus.components).map(([key, status]) => (
-                  <Box 
-                    key={key} 
-                    sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
+                  <Box
+                    key={key}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
                       justifyContent: 'space-between',
                       p: 1.5,
                       borderRadius: 1,
@@ -1195,20 +1195,20 @@ const SystemStatus: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
                     <Typography variant="body2">
                       {key.charAt(0).toUpperCase() + key.slice(1)}
                     </Typography>
-                    <Chip 
-                      size="small" 
-                      label={status.charAt(0).toUpperCase() + status.slice(1)} 
-                      sx={{ 
+                    <Chip
+                      size="small"
+                      label={status.charAt(0).toUpperCase() + status.slice(1)}
+                      sx={{
                         bgcolor: alpha(getComponentStatusColor(status), 0.1),
                         color: getComponentStatusColor(status),
                         fontWeight: 500,
                         fontSize: '0.7rem'
-                      }} 
+                      }}
                     />
                   </Box>
                 ))}
               </Stack>
-              
+
               {/* API Response Time */}
               <Box sx={{ display: 'flex', mb: 1 }}>
                 <Box sx={{ flex: 1 }}>
@@ -1228,7 +1228,7 @@ const SystemStatus: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
                   </Typography>
                 </Box>
               </Box>
-              
+
               {/* Estimated Processing Time */}
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                 Estimated processing time: {systemStatus.queueStatus.estimatedTime} {systemStatus.queueStatus.estimatedTime === 1 ? 'minute' : 'minutes'}
@@ -1248,7 +1248,7 @@ const FavoriteDocuments: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
   const [favoriteDocuments, setFavoriteDocuments] = useState<Document[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [favoriteLoading, setFavoriteLoading] = useState<boolean>(false);
-  
+
   useEffect(() => {
     const fetchFavorites = async () => {
       try {
@@ -1259,7 +1259,7 @@ const FavoriteDocuments: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
         setError(err.message || 'Failed to load favorite documents');
       }
     };
-    
+
     if (!isLoading) {
       fetchFavorites();
     }
@@ -1269,7 +1269,7 @@ const FavoriteDocuments: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
     setFavoriteLoading(true);
     try {
       await mockServices.toggleFavoriteDocument(documentId, isFavorite);
-      
+
       // Update local state
       if (isFavorite) {
         // Add to favorites (in a real implementation, we would fetch the document details)
@@ -1285,7 +1285,7 @@ const FavoriteDocuments: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
       setFavoriteLoading(false);
     }
   };
-  
+
   return (
     <Card
       component={motion.div}
@@ -1299,11 +1299,11 @@ const FavoriteDocuments: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
       }}
     >
       <CardContent sx={{ p: 3 }}>
-        <SectionHeader 
-          title="Favorite Documents" 
+        <SectionHeader
+          title="Favorite Documents"
           action={
-            <Button 
-              size="small" 
+            <Button
+              size="small"
               endIcon={<ArrowForwardIcon />}
               sx={{ textTransform: 'none' }}
               onClick={() => navigate('/documents?filter=favorites')}
@@ -1312,7 +1312,7 @@ const FavoriteDocuments: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
             </Button>
           }
         />
-        
+
         <LoadingWrapper loading={isLoading || favoriteLoading} error={error}>
           {favoriteDocuments.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -1323,8 +1323,8 @@ const FavoriteDocuments: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
                 Mark documents as favorites for quick access
               </Typography>
-              <Button 
-                variant="outlined" 
+              <Button
+                variant="outlined"
                 sx={{ mt: 1 }}
                 onClick={() => navigate('/documents')}
               >
@@ -1334,10 +1334,10 @@ const FavoriteDocuments: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
           ) : (
             <Box sx={{ maxHeight: 350, overflow: 'auto' }}>
               {favoriteDocuments.map(doc => (
-                <DocumentCard 
-                  key={doc.id} 
-                  document={doc} 
-                  onClick={() => navigate(`/documents/${doc.id}`)} 
+                <DocumentCard
+                  key={doc.id}
+                  document={doc}
+                  onClick={() => navigate(`/documents/${doc.id}`)}
                   onToggleFavorite={handleToggleFavorite}
                   isFavorite={true}
                 />
@@ -1358,7 +1358,7 @@ const NotificationItem: React.FC<{
   onClick?: () => void;
 }> = ({ notification, onRead, onDismiss, onClick }) => {
   const theme = useTheme();
-  
+
   // Map notification type to color
   const getNotificationColor = (type: Notification['type']): string => {
     switch (type) {
@@ -1372,7 +1372,7 @@ const NotificationItem: React.FC<{
         return theme.palette.info.main;
     }
   };
-  
+
   // Map notification type to icon
   const getNotificationIcon = (type: Notification['type']): React.ReactElement => {
     switch (type) {
@@ -1386,26 +1386,26 @@ const NotificationItem: React.FC<{
         return <InfoOutlinedIcon fontSize="small" />;
     }
   };
-  
+
   // Format the timestamp
   const formatTimestamp = (date: Date): string => {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
-    
+
     // Less than a day
     if (diff < 24 * 60 * 60 * 1000) {
       return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
-    
+
     // Less than a week
     if (diff < 7 * 24 * 60 * 60 * 1000) {
       return new Date(date).toLocaleDateString([], { weekday: 'short' });
     }
-    
+
     // More than a week
     return new Date(date).toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
-  
+
   const handleClick = () => {
     if (!notification.read) {
       onRead(notification.id);
@@ -1414,16 +1414,16 @@ const NotificationItem: React.FC<{
       onClick();
     }
   };
-  
+
   const handleDismiss = (e: React.MouseEvent) => {
     e.stopPropagation();
     onDismiss(notification.id);
   };
-  
+
   return (
-    <Card 
-      sx={{ 
-        mb: 1, 
+    <Card
+      sx={{
+        mb: 1,
         borderRadius: 2,
         transition: 'all 0.2s ease',
         bgcolor: notification.read ? 'transparent' : alpha(getNotificationColor(notification.type), 0.05),
@@ -1439,8 +1439,8 @@ const NotificationItem: React.FC<{
     >
       <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
         <Box sx={{ display: 'flex' }}>
-          <Box 
-            sx={{ 
+          <Box
+            sx={{
               mr: 1.5,
               mt: 0.5,
               display: 'flex',
@@ -1455,7 +1455,7 @@ const NotificationItem: React.FC<{
           >
             {getNotificationIcon(notification.type)}
           </Box>
-          
+
           <Box sx={{ flex: 1 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
               <Typography variant="subtitle2" fontWeight={600}>
@@ -1465,27 +1465,27 @@ const NotificationItem: React.FC<{
                 <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
                   {formatTimestamp(notification.timestamp)}
                 </Typography>
-                <IconButton 
-                  size="small" 
+                <IconButton
+                  size="small"
                   onClick={handleDismiss}
-                  sx={{ 
-                    width: 20, 
-                    height: 20, 
-                    '& .MuiSvgIcon-root': { fontSize: '0.875rem' } 
+                  sx={{
+                    width: 20,
+                    height: 20,
+                    '& .MuiSvgIcon-root': { fontSize: '0.875rem' }
                   }}
                 >
                   <CancelIcon />
                 </IconButton>
               </Box>
             </Box>
-            
+
             <Typography variant="body2" color="text.secondary">
               {notification.message}
             </Typography>
-            
+
             {notification.actionRequired && notification.actionText && (
-              <Button 
-                size="small" 
+              <Button
+                size="small"
                 sx={{ mt: 1, p: 0, minHeight: 0, minWidth: 0, textTransform: 'none' }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1508,7 +1508,7 @@ const NotificationsCenter: React.FC<{ isLoading: boolean }> = ({ isLoading }) =>
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [error, setError] = useState<string | null>(null);
-  
+
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
@@ -1519,7 +1519,7 @@ const NotificationsCenter: React.FC<{ isLoading: boolean }> = ({ isLoading }) =>
         setError(err.message || 'Failed to load notifications');
       }
     };
-    
+
     if (!isLoading) {
       fetchNotifications();
     }
@@ -1529,8 +1529,8 @@ const NotificationsCenter: React.FC<{ isLoading: boolean }> = ({ isLoading }) =>
     try {
       await mockServices.markNotificationAsRead(id);
       // Update the local state
-      setNotifications(prevNotifications => 
-        prevNotifications.map(notif => 
+      setNotifications(prevNotifications =>
+        prevNotifications.map(notif =>
           notif.id === id ? { ...notif, read: true } : notif
         )
       );
@@ -1543,7 +1543,7 @@ const NotificationsCenter: React.FC<{ isLoading: boolean }> = ({ isLoading }) =>
     try {
       await mockServices.dismissNotification(id);
       // Update the local state
-      setNotifications(prevNotifications => 
+      setNotifications(prevNotifications =>
         prevNotifications.filter(notif => notif.id !== id)
       );
     } catch (err) {
@@ -1560,7 +1560,7 @@ const NotificationsCenter: React.FC<{ isLoading: boolean }> = ({ isLoading }) =>
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
-  
+
   return (
     <Card
       component={motion.div}
@@ -1574,26 +1574,26 @@ const NotificationsCenter: React.FC<{ isLoading: boolean }> = ({ isLoading }) =>
       }}
     >
       <CardContent sx={{ p: 3 }}>
-        <SectionHeader 
+        <SectionHeader
           title={
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <Typography component="span">Notifications</Typography>
               {unreadCount > 0 && (
-                <Chip 
-                  size="small" 
-                  label={unreadCount} 
-                  sx={{ 
-                    ml: 1, 
+                <Chip
+                  size="small"
+                  label={unreadCount}
+                  sx={{
+                    ml: 1,
                     bgcolor: alpha(theme.palette.primary.main, 0.1),
                     color: theme.palette.primary.main,
                     fontWeight: 600,
                     height: 20,
                     '& .MuiChip-label': { px: 1 }
-                  }} 
+                  }}
                 />
               )}
             </Box>
-          } 
+          }
           action={
             <Button
               size="small"
@@ -1604,7 +1604,7 @@ const NotificationsCenter: React.FC<{ isLoading: boolean }> = ({ isLoading }) =>
                     await mockServices.markNotificationAsRead(notification.id);
                   }
                   // Update the local state
-                  setNotifications(prevNotifications => 
+                  setNotifications(prevNotifications =>
                     prevNotifications.map(notif => ({ ...notif, read: true }))
                   );
                 };
@@ -1617,7 +1617,7 @@ const NotificationsCenter: React.FC<{ isLoading: boolean }> = ({ isLoading }) =>
             </Button>
           }
         />
-        
+
         <LoadingWrapper loading={isLoading} error={error}>
           {notifications.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -1629,8 +1629,8 @@ const NotificationsCenter: React.FC<{ isLoading: boolean }> = ({ isLoading }) =>
           ) : (
             <Box sx={{ maxHeight: 350, overflow: 'auto' }}>
               {notifications.map(notification => (
-                <NotificationItem 
-                  key={notification.id} 
+                <NotificationItem
+                  key={notification.id}
                   notification={notification}
                   onRead={handleMarkAsRead}
                   onDismiss={handleDismissNotification}
@@ -1651,7 +1651,7 @@ const PerformanceMetrics: React.FC<{ isLoading: boolean }> = ({ isLoading }) => 
   const [metrics, setMetrics] = useState<PerformanceMetric[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<number>(0);
-  
+
   useEffect(() => {
     const fetchMetrics = async () => {
       try {
@@ -1662,7 +1662,7 @@ const PerformanceMetrics: React.FC<{ isLoading: boolean }> = ({ isLoading }) => 
         setError(err.message || 'Failed to load performance metrics');
       }
     };
-    
+
     if (!isLoading) {
       fetchMetrics();
     }
@@ -1671,7 +1671,7 @@ const PerformanceMetrics: React.FC<{ isLoading: boolean }> = ({ isLoading }) => 
   // Format data for charts
   const chartData = useMemo(() => {
     if (!metrics.length) return [];
-    
+
     return metrics.map(metric => ({
       date: new Date(metric.date).toLocaleDateString([], { month: 'short', day: 'numeric' }),
       documents: metric.documentsProcessed,
@@ -1684,10 +1684,10 @@ const PerformanceMetrics: React.FC<{ isLoading: boolean }> = ({ isLoading }) => 
   // Calculate trends
   const trends = useMemo(() => {
     if (metrics.length < 2) return { documents: 0, queries: 0, queryTime: 0, processingTime: 0 };
-    
+
     const latest = metrics[metrics.length - 1];
     const previous = metrics[metrics.length - 2];
-    
+
     return {
       documents: ((latest.documentsProcessed - previous.documentsProcessed) / previous.documentsProcessed) * 100,
       queries: ((latest.queriesExecuted - previous.queriesExecuted) / previous.queriesExecuted) * 100,
@@ -1700,10 +1700,10 @@ const PerformanceMetrics: React.FC<{ isLoading: boolean }> = ({ isLoading }) => 
   const TrendIndicator: React.FC<{ value: number, inverse?: boolean }> = ({ value, inverse = false }) => {
     let color = theme.palette.grey[500];
     let icon = null;
-    
+
     // For metrics where lower is better (like response times), invert the logic
     const adjustedValue = inverse ? -value : value;
-    
+
     if (adjustedValue > 0) {
       color = theme.palette.success.main;
       icon = <TrendingUpIcon fontSize="small" />;
@@ -1711,13 +1711,13 @@ const PerformanceMetrics: React.FC<{ isLoading: boolean }> = ({ isLoading }) => 
       color = theme.palette.error.main;
       icon = <TrendingUpIcon fontSize="small" style={{ transform: 'rotate(180deg)' }} />;
     }
-    
+
     return (
-      <Box 
-        sx={{ 
-          display: 'flex', 
+      <Box
+        sx={{
+          display: 'flex',
           alignItems: 'center',
-          color 
+          color
         }}
       >
         {icon}
@@ -1727,7 +1727,7 @@ const PerformanceMetrics: React.FC<{ isLoading: boolean }> = ({ isLoading }) => 
       </Box>
     );
   };
-  
+
   return (
     <Card
       component={motion.div}
@@ -1741,22 +1741,22 @@ const PerformanceMetrics: React.FC<{ isLoading: boolean }> = ({ isLoading }) => 
       }}
     >
       <CardContent sx={{ p: 3 }}>
-        <SectionHeader 
-          title="Performance Metrics" 
+        <SectionHeader
+          title="Performance Metrics"
           action={
             <Tooltip title="View detailed analytics">
-              <Button 
-                size="small" 
+              <Button
+                size="small"
                 endIcon={<ArrowForwardIcon />}
                 sx={{ textTransform: 'none' }}
-                onClick={() => {/* Navigate to analytics page */}}
+                onClick={() => {/* Navigate to analytics page */ }}
               >
                 Details
               </Button>
             </Tooltip>
           }
         />
-        
+
         <LoadingWrapper loading={isLoading} error={error}>
           {metrics.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -1769,8 +1769,8 @@ const PerformanceMetrics: React.FC<{ isLoading: boolean }> = ({ isLoading }) => 
             <>
               {/* Metric Cards */}
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
-                <Card sx={{ 
-                  flex: '1 1 calc(50% - 8px)', 
+                <Card sx={{
+                  flex: '1 1 calc(50% - 8px)',
                   minWidth: { xs: '100%', sm: 'calc(50% - 8px)' },
                   p: 1.5,
                   borderRadius: 2,
@@ -1785,9 +1785,9 @@ const PerformanceMetrics: React.FC<{ isLoading: boolean }> = ({ isLoading }) => 
                     {metrics[metrics.length - 1]?.documentsProcessed || 0}
                   </Typography>
                 </Card>
-                
-                <Card sx={{ 
-                  flex: '1 1 calc(50% - 8px)', 
+
+                <Card sx={{
+                  flex: '1 1 calc(50% - 8px)',
                   minWidth: { xs: '100%', sm: 'calc(50% - 8px)' },
                   p: 1.5,
                   borderRadius: 2,
@@ -1802,9 +1802,9 @@ const PerformanceMetrics: React.FC<{ isLoading: boolean }> = ({ isLoading }) => 
                     {metrics[metrics.length - 1]?.queriesExecuted || 0}
                   </Typography>
                 </Card>
-                
-                <Card sx={{ 
-                  flex: '1 1 calc(50% - 8px)', 
+
+                <Card sx={{
+                  flex: '1 1 calc(50% - 8px)',
                   minWidth: { xs: '100%', sm: 'calc(50% - 8px)' },
                   p: 1.5,
                   borderRadius: 2,
@@ -1819,9 +1819,9 @@ const PerformanceMetrics: React.FC<{ isLoading: boolean }> = ({ isLoading }) => 
                     {metrics[metrics.length - 1]?.avgQueryTime || 0}ms
                   </Typography>
                 </Card>
-                
-                <Card sx={{ 
-                  flex: '1 1 calc(50% - 8px)', 
+
+                <Card sx={{
+                  flex: '1 1 calc(50% - 8px)',
                   minWidth: { xs: '100%', sm: 'calc(50% - 8px)' },
                   p: 1.5,
                   borderRadius: 2,
@@ -1837,14 +1837,14 @@ const PerformanceMetrics: React.FC<{ isLoading: boolean }> = ({ isLoading }) => 
                   </Typography>
                 </Card>
               </Box>
-              
+
               {/* Chart Tabs */}
               <Box sx={{ width: '100%', mt: 3 }}>
-                <Tabs 
-                  value={activeTab} 
+                <Tabs
+                  value={activeTab}
                   onChange={(_, newValue) => setActiveTab(newValue)}
                   variant="fullWidth"
-                  sx={{ 
+                  sx={{
                     mb: 2,
                     '& .MuiTab-root': {
                       textTransform: 'none',
@@ -1857,14 +1857,14 @@ const PerformanceMetrics: React.FC<{ isLoading: boolean }> = ({ isLoading }) => 
                   <Tab label="Queries" />
                   <Tab label="Response Times" />
                 </Tabs>
-                
+
                 {/* Chart data visualization would go here */}
                 {/* In a real implementation, we would use Recharts to render line charts */}
-                <Box sx={{ 
-                  height: 150, 
-                  width: '100%', 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                <Box sx={{
+                  height: 150,
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
                   justifyContent: 'center',
                   bgcolor: alpha(theme.palette.divider, 0.05),
                   borderRadius: 2,
@@ -1877,7 +1877,7 @@ const PerformanceMetrics: React.FC<{ isLoading: boolean }> = ({ isLoading }) => 
                     {activeTab === 2 && 'Response Times Chart'}
                   </Typography>
                 </Box>
-                
+
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textAlign: 'center' }}>
                   Data for the last 7 days
                 </Typography>
@@ -1896,7 +1896,7 @@ const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isDarkMode = theme.palette.mode === 'dark';
-  
+
   // State for data
   const [documents, setDocuments] = useState<Document[]>([]);
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
@@ -1904,7 +1904,7 @@ const HomePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
   const [favoriteDocuments, setFavoriteDocuments] = useState<Set<string>>(new Set());
-  
+
   // Calculate stats from the data
   const stats: StatsData = useMemo(() => {
     if (documents.length === 0) {
@@ -1917,11 +1917,11 @@ const HomePage: React.FC = () => {
         recentChats: chatSessions.length
       };
     }
-    
+
     const processed = documents.filter(doc => isProcessed(doc)).length;
     const processing = documents.filter(doc => !isProcessed(doc) && !doc.processing_error).length;
     const errors = documents.filter(doc => !!doc.processing_error).length;
-    
+
     // Calculate total storage
     let totalBytes = 0;
     documents.forEach(doc => {
@@ -1936,7 +1936,7 @@ const HomePage: React.FC = () => {
         }
       }
     });
-    
+
     return {
       totalDocuments: documents.length,
       processedDocuments: processed,
@@ -1946,18 +1946,18 @@ const HomePage: React.FC = () => {
       recentChats: chatSessions.length
     };
   }, [documents, chatSessions]);
-  
+
   // Fetch data
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
         // Fetch documents
         const docsData = await getAllDocuments();
         setDocuments(docsData);
-        
+
         // Fetch chat sessions
         const chatsData = await getAllChatSessions();
         setChatSessions(chatsData);
@@ -1968,10 +1968,10 @@ const HomePage: React.FC = () => {
         setLoading(false);
       }
     };
-    
+
     fetchData();
   }, [refreshTrigger]);
-  
+
   // Handle refresh
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -1981,7 +1981,7 @@ const HomePage: React.FC = () => {
   const handleToggleFavorite = async (documentId: string, isFavorite: boolean) => {
     try {
       await mockServices.toggleFavoriteDocument(documentId, isFavorite);
-      
+
       // Update local state
       if (isFavorite) {
         setFavoriteDocuments(prev => new Set([...prev, documentId]));
@@ -1996,7 +1996,7 @@ const HomePage: React.FC = () => {
       console.error('Error toggling favorite status:', err);
     }
   };
-  
+
   return (
     <Box sx={{ width: '100%' }}>
       <motion.div
@@ -2005,13 +2005,13 @@ const HomePage: React.FC = () => {
         animate="visible"
       >
         {/* Welcome header */}
-        <Paper 
+        <Paper
           elevation={0}
           component={motion.div}
           variants={itemVariants}
-          sx={{ 
-            p: 3, 
-            mb: 4, 
+          sx={{
+            p: 3,
+            mb: 4,
             borderRadius: '16px',
             background: isDarkMode
               ? `linear-gradient(135deg, ${alpha(theme.palette.primary.dark, 0.4)} 0%, ${alpha(theme.palette.secondary.dark, 0.2)} 100%)`
@@ -2033,14 +2033,14 @@ const HomePage: React.FC = () => {
         >
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box>
-              <Typography variant="h4" component="h1" gutterBottom sx={{ 
+              <Typography variant="h4" component="h1" gutterBottom sx={{
                 fontWeight: 700,
                 color: theme.palette.text.primary
               }}>
                 Welcome back, {user?.first_name || 'User'}
               </Typography>
-              <Typography variant="body1" sx={{ 
-                maxWidth: '800px', 
+              <Typography variant="body1" sx={{
+                maxWidth: '800px',
                 mb: 2,
                 color: theme.palette.text.secondary
               }}>
@@ -2052,7 +2052,7 @@ const HomePage: React.FC = () => {
                 variant="outlined"
                 startIcon={<RefreshIcon />}
                 onClick={handleRefresh}
-                sx={{ 
+                sx={{
                   borderRadius: 2,
                   textTransform: 'none',
                   fontWeight: 500
@@ -2063,7 +2063,7 @@ const HomePage: React.FC = () => {
             </Tooltip>
           </Box>
         </Paper>
-        
+
         {/* Stats section */}
         <Box component={motion.div} variants={itemVariants} sx={{ mb: 4 }}>
           <SectionHeader title="Quick Stats" />
@@ -2107,20 +2107,21 @@ const HomePage: React.FC = () => {
             </Box>
           </Box>
         </Box>
-        
+
         {/* New Features: Storage, Timeline, System Status */}
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, mb: 4 }}>
+          <Box sx={{ flex: '1 1 calc(33.333% - 16px)', minWidth: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(33.333% - 16px)' } }}>
+            <FavoriteDocuments isLoading={loading} />
+
+          </Box>
           <Box sx={{ flex: '1 1 calc(33.333% - 16px)', minWidth: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(33.333% - 16px)' } }}>
             <NotificationsCenter isLoading={loading} />
           </Box>
           <Box sx={{ flex: '1 1 calc(33.333% - 16px)', minWidth: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(33.333% - 16px)' } }}>
             <PerformanceMetrics isLoading={loading} />
           </Box>
-          <Box sx={{ flex: '1 1 calc(33.333% - 16px)', minWidth: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(33.333% - 16px)' } }}>
-            <SystemStatus isLoading={loading} />
-          </Box>
         </Box>
-        
+
         {/* Main Content Sections */}
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} sx={{ mb: 4 }}>
           {/* Left Column: Recent Activity */}
@@ -2128,18 +2129,18 @@ const HomePage: React.FC = () => {
             <Paper
               component={motion.div}
               variants={itemVariants}
-              sx={{ 
-                p: 3, 
+              sx={{
+                p: 3,
                 borderRadius: '16px',
                 height: '100%',
                 boxShadow: `0 4px 20px rgba(0,0,0,0.03), 0 2px 8px ${alpha(theme.palette.primary.main, 0.04)}`,
               }}
             >
-              <SectionHeader 
-                title="Recent Activity" 
+              <SectionHeader
+                title="Recent Activity"
                 action={
-                  <Button 
-                    size="small" 
+                  <Button
+                    size="small"
                     endIcon={<ArrowForwardIcon />}
                     sx={{ textTransform: 'none' }}
                   >
@@ -2147,7 +2148,7 @@ const HomePage: React.FC = () => {
                   </Button>
                 }
               />
-              
+
               <LoadingWrapper loading={loading} error={error}>
                 {documents.length === 0 && chatSessions.length === 0 ? (
                   <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -2155,8 +2156,8 @@ const HomePage: React.FC = () => {
                     <Typography variant="body1" color="text.secondary">
                       No recent activity to display
                     </Typography>
-                    <Button 
-                      variant="outlined" 
+                    <Button
+                      variant="outlined"
                       sx={{ mt: 2 }}
                       onClick={() => navigate('/upload')}
                     >
@@ -2176,7 +2177,7 @@ const HomePage: React.FC = () => {
                         onClick={() => navigate(`/documents/${doc.id}`)}
                       />
                     ))}
-                    
+
                     {/* Recent chats */}
                     {chatSessions.slice(0, 3).map((chat) => (
                       <ActivityItem
@@ -2193,21 +2194,21 @@ const HomePage: React.FC = () => {
               </LoadingWrapper>
             </Paper>
           </Box>
-          
+
           {/* Right Column: Quick Actions */}
           <Box sx={{ flex: 1 }}>
             <Paper
               component={motion.div}
               variants={itemVariants}
-              sx={{ 
-                p: 3, 
+              sx={{
+                p: 3,
                 borderRadius: '16px',
                 height: '100%',
                 boxShadow: `0 4px 20px rgba(0,0,0,0.03), 0 2px 8px ${alpha(theme.palette.primary.main, 0.04)}`,
               }}
             >
               <SectionHeader title="Quick Actions" />
-              
+
               <ActionButton
                 title="Upload Document"
                 description="Upload a new document for processing"
@@ -2215,7 +2216,7 @@ const HomePage: React.FC = () => {
                 color={theme.palette.primary.main}
                 onClick={() => navigate('/upload')}
               />
-              
+
               <ActionButton
                 title="Start New Query"
                 description="Ask questions about your documents"
@@ -2223,7 +2224,7 @@ const HomePage: React.FC = () => {
                 color={theme.palette.secondary.main}
                 onClick={() => navigate('/query-agent')}
               />
-              
+
               <ActionButton
                 title="Create Visualization"
                 description="Generate visual insights from your data"
@@ -2231,7 +2232,7 @@ const HomePage: React.FC = () => {
                 color={theme.palette.info.main}
                 onClick={() => navigate('/visualizations')}
               />
-              
+
               <ActionButton
                 title="Browse Documents"
                 description="View and manage your document library"
@@ -2242,36 +2243,36 @@ const HomePage: React.FC = () => {
             </Paper>
           </Box>
         </Stack>
-        
+
         {/* New Features: Favorites, Notifications, Timeline */}
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, mb: 4 }}>
-          <Box sx={{ flex: '1 1 calc(33.333% - 16px)', minWidth: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(33.333% - 16px)' } }}>
-            <FavoriteDocuments isLoading={loading} />
-          </Box>
           <Box sx={{ flex: '1 1 calc(33.333% - 16px)', minWidth: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(33.333% - 16px)' } }}>
             <DocumentTimeline isLoading={loading} />
           </Box>
           <Box sx={{ flex: '1 1 calc(33.333% - 16px)', minWidth: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(33.333% - 16px)' } }}>
             <StorageUsage isLoading={loading} />
           </Box>
+          <Box sx={{ flex: '1 1 calc(33.333% - 16px)', minWidth: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(33.333% - 16px)' } }}>
+            <SystemStatus isLoading={loading} />
+          </Box>
         </Box>
-        
+
         {/* Document Insights */}
         <Paper
           component={motion.div}
           variants={itemVariants}
-          sx={{ 
-            p: 3, 
+          sx={{
+            p: 3,
             mt: 3,
             borderRadius: '16px',
             boxShadow: `0 4px 20px rgba(0,0,0,0.03), 0 2px 8px ${alpha(theme.palette.primary.main, 0.04)}`,
           }}
         >
-          <SectionHeader 
-            title="Document Insights" 
+          <SectionHeader
+            title="Document Insights"
             action={
-              <Button 
-                size="small" 
+              <Button
+                size="small"
                 endIcon={<ArrowForwardIcon />}
                 sx={{ textTransform: 'none' }}
                 onClick={() => navigate('/documents')}
@@ -2280,7 +2281,7 @@ const HomePage: React.FC = () => {
               </Button>
             }
           />
-          
+
           <LoadingWrapper loading={loading} error={error}>
             {documents.length === 0 ? (
               <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -2288,8 +2289,8 @@ const HomePage: React.FC = () => {
                 <Typography variant="body1" color="text.secondary">
                   No documents to display
                 </Typography>
-                <Button 
-                  variant="outlined" 
+                <Button
+                  variant="outlined"
                   sx={{ mt: 2 }}
                   onClick={() => navigate('/upload')}
                 >
@@ -2312,11 +2313,11 @@ const HomePage: React.FC = () => {
                         {stats.processedDocuments} / {stats.totalDocuments}
                       </Typography>
                     </Box>
-                    <LinearProgress 
-                      variant="determinate" 
-                      value={(stats.processedDocuments / (stats.totalDocuments || 1)) * 100} 
-                      sx={{ 
-                        height: 10, 
+                    <LinearProgress
+                      variant="determinate"
+                      value={(stats.processedDocuments / (stats.totalDocuments || 1)) * 100}
+                      sx={{
+                        height: 10,
                         borderRadius: 5,
                         backgroundColor: alpha(theme.palette.success.main, 0.2),
                         '& .MuiLinearProgress-bar': {
@@ -2325,7 +2326,7 @@ const HomePage: React.FC = () => {
                       }}
                     />
                   </Box>
-                  
+
                   <Box sx={{ mb: 3 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                       <Typography variant="body2">
@@ -2335,11 +2336,11 @@ const HomePage: React.FC = () => {
                         {stats.processingDocuments} / {stats.totalDocuments}
                       </Typography>
                     </Box>
-                    <LinearProgress 
-                      variant="determinate" 
-                      value={(stats.processingDocuments / (stats.totalDocuments || 1)) * 100} 
-                      sx={{ 
-                        height: 10, 
+                    <LinearProgress
+                      variant="determinate"
+                      value={(stats.processingDocuments / (stats.totalDocuments || 1)) * 100}
+                      sx={{
+                        height: 10,
                         borderRadius: 5,
                         backgroundColor: alpha(theme.palette.warning.main, 0.2),
                         '& .MuiLinearProgress-bar': {
@@ -2348,7 +2349,7 @@ const HomePage: React.FC = () => {
                       }}
                     />
                   </Box>
-                  
+
                   <Box sx={{ mb: 3 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                       <Typography variant="body2">
@@ -2358,11 +2359,11 @@ const HomePage: React.FC = () => {
                         {stats.errorDocuments} / {stats.totalDocuments}
                       </Typography>
                     </Box>
-                    <LinearProgress 
-                      variant="determinate" 
-                      value={(stats.errorDocuments / (stats.totalDocuments || 1)) * 100} 
-                      sx={{ 
-                        height: 10, 
+                    <LinearProgress
+                      variant="determinate"
+                      value={(stats.errorDocuments / (stats.totalDocuments || 1)) * 100}
+                      sx={{
+                        height: 10,
                         borderRadius: 5,
                         backgroundColor: alpha(theme.palette.error.main, 0.2),
                         '& .MuiLinearProgress-bar': {
@@ -2372,7 +2373,7 @@ const HomePage: React.FC = () => {
                     />
                   </Box>
                 </Box>
-                
+
                 {/* Recently Processed */}
                 <Box sx={{ flex: 1, width: { xs: '100%', md: '33.33%' } }}>
                   <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
@@ -2382,15 +2383,15 @@ const HomePage: React.FC = () => {
                     .filter(doc => isProcessed(doc))
                     .slice(0, 4)
                     .map(doc => (
-                      <DocumentCard 
-                        key={doc.id} 
-                        document={doc} 
-                        onClick={() => navigate(`/documents/${doc.id}`)} 
+                      <DocumentCard
+                        key={doc.id}
+                        document={doc}
+                        onClick={() => navigate(`/documents/${doc.id}`)}
                         onToggleFavorite={handleToggleFavorite}
                         isFavorite={favoriteDocuments.has(doc.id)}
                       />
                     ))}
-                    
+
                   {documents.filter(doc => isProcessed(doc)).length === 0 && (
                     <Box sx={{ textAlign: 'center', py: 4 }}>
                       <HourglassEmptyIcon sx={{ fontSize: 40, color: theme.palette.warning.main, mb: 2 }} />
@@ -2400,7 +2401,7 @@ const HomePage: React.FC = () => {
                     </Box>
                   )}
                 </Box>
-                
+
                 {/* Documents with Issues */}
                 <Box sx={{ flex: 1, width: { xs: '100%', md: '33.33%' } }}>
                   <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
@@ -2410,15 +2411,15 @@ const HomePage: React.FC = () => {
                     .filter(doc => doc.processing_error)
                     .slice(0, 4)
                     .map(doc => (
-                      <DocumentCard 
-                        key={doc.id} 
-                        document={doc} 
-                        onClick={() => navigate(`/documents/${doc.id}`)} 
+                      <DocumentCard
+                        key={doc.id}
+                        document={doc}
+                        onClick={() => navigate(`/documents/${doc.id}`)}
                         onToggleFavorite={handleToggleFavorite}
                         isFavorite={favoriteDocuments.has(doc.id)}
                       />
                     ))}
-                    
+
                   {documents.filter(doc => doc.processing_error).length === 0 && (
                     <Box sx={{ textAlign: 'center', py: 4 }}>
                       <CheckCircleIcon sx={{ fontSize: 40, color: theme.palette.success.main, mb: 2 }} />

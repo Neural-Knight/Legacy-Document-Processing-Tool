@@ -14,6 +14,7 @@ import SignupPage from './pages/SignupPage';
 import HomePage from './pages/HomePage';
 import UploadPage from './pages/UploadPage';
 import MyDocumentsPage from './pages/MyDocumentsPage';
+import VisualizationsPage from './pages/VisualizationsPage';
 import QueryAgentPage from './pages/QueryAgentPage';
 import NotFoundPage from './pages/NotFoundPage';
 import './App.css';
@@ -62,7 +63,7 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            {/* <Route 
+            <Route 
               path="/visualizations" 
               element={
                 <ProtectedRoute>
@@ -71,7 +72,7 @@ function App() {
                   </Layout>
                 </ProtectedRoute>
               } 
-            /> */}
+            />
             
             <Route 
               path="/query-agent" 

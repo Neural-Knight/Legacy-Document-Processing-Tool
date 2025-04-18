@@ -19,7 +19,7 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
  * @param filename The filename to check
  * @returns The corresponding icon component
  */
-export const getDocumentIcon = (filename: string): React.ReactNode => {
+export const getDocumentIcon = (filename: string): React.ReactElement | undefined => {
   const extension = filename.split('.').pop()?.toLowerCase();
   
   switch (extension) {
