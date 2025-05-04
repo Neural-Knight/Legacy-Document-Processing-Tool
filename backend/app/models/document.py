@@ -21,6 +21,7 @@ class Document(Base):
     # Add this new field to link to users
     user_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="documents")
+    favorited_by = relationship("UserFavorite", back_populates="document", cascade="all, delete-orphan")
     
     # Add a composite index for efficient querying on multiple columns
     __table_args__ = (

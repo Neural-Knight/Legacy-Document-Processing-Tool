@@ -1,13 +1,14 @@
 import os
 import mimetypes
 import logging
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Query
-from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Query, Body
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from fastapi.responses import StreamingResponse
 from app.db.session import get_db
 from app.services.storage_service import get_storage_service
-from app.crud.document import create_document, get_document, get_documents, delete_document, get_user_documents
+from app.crud.document import create_document, get_document, get_documents, delete_document, get_user_documents, get_user_favorites, update_favorite_status
 from app.schemas.document import Document, DocumentCreate
 from app.core.config import settings
 from app.api.deps import get_current_user, get_current_active_user, get_current_active_superuser
@@ -15,6 +16,9 @@ from app.models.user import User
 
 from psycopg2.errors import UniqueViolation
 from sqlalchemy.exc import IntegrityError
+
+class FavoriteRequest(BaseModel):
+    favorite: bool
 
 router = APIRouter()
 
@@ -83,7 +87,81 @@ async def upload_file(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Could not upload file: {str(e)}"
         )
+
+
+#Get user's favorite documents
+@router.get("/documents/favorites",response_model=List[Document])
+async def get_favorite_documents(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)  # Require authenticated user
+):
+    """
+    Retrieve user's favorite documents.
+    
+    Each user has their own favorites collection.
+    """
+    logger.info(f"User {current_user.id} retrieving favorite documents")
+    
+    try:
+        # Get user's favorite document IDs from the database
+        documents=get_user_favorites(db,user_id=current_user.id)
+        return documents
+    except Exception as e:
+        logger.error(f"Error retrieving favorite documents for user {current_user.id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not retrieve favorite documents: {str(e)}"
+        )
         
+# Toggle favorite status for a document
+@router.post("/documents/{document_id}/favorite", response_model=Dict[str, Any])
+async def toggle_favorite_document(
+    document_id: int,
+    favorite_request: FavoriteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Toggle favorite status for a document.
+    
+    Users can only favorite their own documents or documents they have access to.
+    """
+    # Check if document exists and user has access to it
+    document=get_document(db,document_id)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+        
+    # Check if user has permission to access this document
+    if document.user_id != current_user.id and not current_user.is_superuser:
+        logger.warning(f"User {current_user.id} attempted to favorite document {document_id} owned by user {document.user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to favorite this document"
+        )
+    
+    try:
+        # Update favorite status in the database
+        success = update_favorite_status(
+            db, 
+            user_id=current_user.id, 
+            document_id=document_id, 
+            is_favorite=favorite_request.favorite
+        )
+        
+        action = "added to" if favorite_request.favorite else "removed from"
+        logger.info(f"Document {document_id} {action} favorites by user {current_user.id}")
+        
+        return {"success": success}
+    except Exception as e:
+        logger.error(f"Error updating favorite status for document {document_id} by user {current_user.id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not update favorite status: {str(e)}"
+        )
+            
 # Retrieve All Documents Endpoint
 @router.get('/documents', response_model=List[Document])
 def get_all_documents(

@@ -7,3 +7,4 @@ pydantic>=2.0.0  # For data validation
 python-dotenv>=1.0.0  # For environment variables
 boto3>=1.28.0  # For AWS S3 integration
 psycopg2-binary>=2.9.6  # PostgreSQL driver
+python-jose[cryptography]>=3.3.0

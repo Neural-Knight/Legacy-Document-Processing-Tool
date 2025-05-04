@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 # Import all models to ensure they're discovered by Alembic
 from app.models.document import Document
 from app.models.user import User, RefreshToken  # Add the new auth models
+from app.models.user_favorite import UserFavorite
 from app.db.session import Base
 from app.core.config import settings
 

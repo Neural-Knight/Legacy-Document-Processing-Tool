@@ -17,6 +17,7 @@ import MyDocumentsPage from './pages/MyDocumentsPage';
 import VisualizationsPage from './pages/VisualizationsPage';
 import QueryAgentPage from './pages/QueryAgentPage';
 import NotFoundPage from './pages/NotFoundPage';
+import DocumentViewerPage from './pages/DocumentViewerPage';
 import './App.css';
 
 function App() {
@@ -80,6 +81,16 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <QueryAgentPage />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/documents/:documentId" 
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <DocumentViewerPage />
                   </Layout>
                 </ProtectedRoute>
               } 

@@ -95,6 +95,11 @@ import { useAuth } from '../context/AuthContext';
 //   getPerformanceMetrics
 // } from '../services/dashboardService';
 
+import { 
+  getFavoriteDocuments, 
+  toggleFavoriteDocument 
+} from '../services/dashboardService';
+
 // Animation variants for framer-motion
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -1252,7 +1257,7 @@ const FavoriteDocuments: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
   useEffect(() => {
     const fetchFavorites = async () => {
       try {
-        const data = await mockServices.getFavoriteDocuments();
+        const data = await getFavoriteDocuments();
         setFavoriteDocuments(data);
       } catch (err: any) {
         console.error('Error fetching favorite documents:', err);
@@ -1268,12 +1273,11 @@ const FavoriteDocuments: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
   const handleToggleFavorite = async (documentId: string, isFavorite: boolean) => {
     setFavoriteLoading(true);
     try {
-      await mockServices.toggleFavoriteDocument(documentId, isFavorite);
+      await toggleFavoriteDocument(documentId, isFavorite);
 
       // Update local state
       if (isFavorite) {
         // Add to favorites (in a real implementation, we would fetch the document details)
-        // For the mock, we'll just leave it as is
       } else {
         // Remove from favorites
         setFavoriteDocuments(prevDocs => prevDocs.filter(doc => doc.id !== documentId));
@@ -1980,7 +1984,7 @@ const HomePage: React.FC = () => {
   // Handle toggling document favorite status
   const handleToggleFavorite = async (documentId: string, isFavorite: boolean) => {
     try {
-      await mockServices.toggleFavoriteDocument(documentId, isFavorite);
+      await toggleFavoriteDocument(documentId, isFavorite);
 
       // Update local state
       if (isFavorite) {

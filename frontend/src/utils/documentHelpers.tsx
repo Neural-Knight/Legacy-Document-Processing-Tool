@@ -164,7 +164,7 @@ export const getOriginalName = (filename: string): string => {
   }
   
   // Remove the first part (UUID or timestamp) and join the rest
-  return parts.slice(1).join('_');
+  return parts.slice(3).join('_');
 };
 
 

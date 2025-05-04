@@ -26,7 +26,7 @@ class User(Base):
     # Relationships
     documents = relationship("Document", back_populates="owner", cascade="all, delete-orphan")
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
-    
+    favorites = relationship("UserFavorite", back_populates="user", cascade="all, delete-orphan")
     @property
     def full_name(self):
         """Return the user's full name or username if not available"""
@@ -60,7 +60,6 @@ class RefreshToken(Base):
     
     # Relationships
     user = relationship("User", back_populates="refresh_tokens")
-    
     def is_valid(self) -> bool:
         """Check if token is still valid (not expired, not revoked)"""
         return not self.revoked and self.expires_at > func.now()

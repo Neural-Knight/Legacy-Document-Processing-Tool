@@ -95,3 +95,7 @@ async def startup_event():
 async def shutdown_event():
     """Cleanup resources on shutdown"""
     logger.info("Shutting down application")
+    
+if __name__=="__main__":
+    import uvicorn
+    uvicorn.run(app,host="0.0.0.0",port=8000)

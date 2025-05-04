@@ -29,7 +29,6 @@ import {
   Collapse,
   Checkbox,
   ListItem as MuiListItem,
-  Stack,
 } from '@mui/material';
 import { motion } from 'framer-motion';
 
@@ -64,7 +63,6 @@ import DatabaseIcon from '@mui/icons-material/Storage';
 import ScatterPlotIcon from '@mui/icons-material/ScatterPlot';
 import ArrowRightIcon from '@mui/icons-material/ArrowRight';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
-import FileIcon from '@mui/icons-material/InsertDriveFile';
 import GridViewIcon from '@mui/icons-material/GridView';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';

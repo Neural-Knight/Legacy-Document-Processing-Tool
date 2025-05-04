@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.document import Document
 from app.schemas.document import DocumentCreate
+from app.models.user_favorite import UserFavorite
 
 def create_document(db: Session, document_data: dict) -> Document:
     # Initialize document with basic attributes
@@ -66,3 +67,38 @@ def get_documents_by_filetype(db: Session, file_type: str, user_id: Optional[int
         query = query.filter(Document.user_id == user_id)
         
     return query.offset(skip).limit(limit).all()
+
+
+def get_user_favorites(db: Session, user_id: int):
+    """Get all favorite documents for a user"""
+    favorite_documents = db.query(Document)\
+        .join(UserFavorite, UserFavorite.document_id == Document.id)\
+        .filter(UserFavorite.user_id == user_id)\
+        .all()
+    return favorite_documents
+
+def update_favorite_status(db: Session, user_id: int, document_id: int, is_favorite: bool):
+    """Add or remove a document from user's favorites"""
+    # Check if favorite relationship already exists
+    existing_favorite = db.query(UserFavorite)\
+        .filter(UserFavorite.user_id == user_id, 
+                UserFavorite.document_id == document_id)\
+        .first()
+    
+    if is_favorite and not existing_favorite:
+        # Add to favorites
+        new_favorite = UserFavorite(
+            user_id=user_id,
+            document_id=document_id
+        )
+        db.add(new_favorite)
+        db.commit()
+        return True
+    elif not is_favorite and existing_favorite:
+        # Remove from favorites
+        db.delete(existing_favorite)
+        db.commit()
+        return True
+    
+    # No change needed
+    return True

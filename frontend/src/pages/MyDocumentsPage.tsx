@@ -25,6 +25,7 @@ import { SortMenu, FilterMenu, DocumentContextMenu } from '../components/MyDocum
 
 // API & Types
 import { Document, getAllDocuments, deleteDocument, downloadDocument } from '../services/documentService';
+import { getFavoriteDocuments, toggleFavoriteDocument } from '../services/dashboardService';
 import { 
   ViewMode, 
   SortBy, 
@@ -72,13 +73,20 @@ const MyDocumentsPage: React.FC = () => {
   // Load documents on component mount
   useEffect(() => {
     loadDocuments();
-    
-    // Load favorites from localStorage
-    const savedFavorites = localStorage.getItem('favoriteDocuments');
-    if (savedFavorites) {
-      setFavoriteDocuments(JSON.parse(savedFavorites));
-    }
+    loadFavorites(); // New function to load favorites from API
   }, []);
+
+  const loadFavorites = async () => {
+    try {
+      const favoriteDocs = await getFavoriteDocuments();
+      // Extract just the IDs from the documents
+      setFavoriteDocuments(favoriteDocs.map(doc => doc.id));
+    } catch (err) {
+      console.error('Failed to load favorites:', err);
+      setError('Failed to load favorite documents. Please try again.');
+    }
+  };
+  
 
   const loadDocuments = async () => {
     try {
@@ -147,15 +155,27 @@ const MyDocumentsPage: React.FC = () => {
     showDeleteConfirmation(docId);
   };
 
-  const toggleFavorite = (docId: string) => {
+  const toggleFavorite = async (docId: string) => {
     setContextMenu(null);
     
-    const newFavorites = favoriteDocuments.includes(docId)
-      ? favoriteDocuments.filter(id => id !== docId)
-      : [...favoriteDocuments, docId];
+    const isFavorite = favoriteDocuments.includes(docId);
     
-    setFavoriteDocuments(newFavorites);
-    localStorage.setItem('favoriteDocuments', JSON.stringify(newFavorites));
+    try {
+      // Call the API to update favorite status
+      const success = await toggleFavoriteDocument(docId, !isFavorite);
+      
+      if (success) {
+        // Update local state to reflect the change
+        const newFavorites = isFavorite
+          ? favoriteDocuments.filter(id => id !== docId)
+          : [...favoriteDocuments, docId];
+        
+        setFavoriteDocuments(newFavorites);
+      }
+    } catch (err) {
+      console.error('Failed to update favorite status:', err);
+      setError('Failed to update favorite status. Please try again.');
+    }
   };
 
   // Handle context menu
@@ -432,7 +452,10 @@ const MyDocumentsPage: React.FC = () => {
             if (doc) openDetails(doc);
             closeContextMenu();
           }}
-          onToggleFavorite={() => toggleFavorite(contextMenu.documentId)}
+          onToggleFavorite={() => {
+            toggleFavorite(contextMenu.documentId);
+            closeContextMenu();
+          }}
           onDelete={() => {
             closeContextMenu();
             handleDelete(contextMenu.documentId);

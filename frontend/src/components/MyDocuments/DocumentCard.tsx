@@ -82,36 +82,7 @@ const DocumentCard: React.FC<DocumentCardProps> = ({
           }
         }}
         onContextMenu={onContextMenu}
-      >
-        {/* Favorite Badge */}
-        {isFavorite && (
-          <Box 
-            sx={{ 
-              position: 'absolute',
-              top: -10,
-              right: -10,
-              zIndex: 1,
-            }}
-          >
-            <Tooltip title="Favorite">
-              <IconButton
-                size="small"
-                onClick={() => onToggleFavorite(doc.id)}
-                sx={{
-                  backgroundColor: theme.palette.background.paper,
-                  boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-                  color: theme.palette.warning.main,
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.warning.main, 0.1),
-                  }
-                }}
-              >
-                <StarIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        )}
-        
+      > 
         {/* Document Type Indicator */}
         <Box sx={{ 
           display: 'flex',
