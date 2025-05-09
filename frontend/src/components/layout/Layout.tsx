@@ -30,7 +30,6 @@ import {
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 
 // Icons
-import HomeIcon from '@mui/icons-material/Home';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import FolderIcon from '@mui/icons-material/Folder';
 import UploadIcon from '@mui/icons-material/Upload';
@@ -55,10 +54,9 @@ interface LayoutProps {
 // Navigation items
 const navItems = [
   { text: 'Dashboard', path: '/', icon: <DashboardIcon /> },
-  { text: 'Upload', path: '/upload', icon: <UploadIcon /> },
   { text: 'My Documents', path: '/documents', icon: <FolderIcon /> },
-  { text: 'Visualizations', path: '/visualizations', icon: <BarChartIcon /> },
   { text: 'Query Agent', path: '/query-agent', icon: <SmartToyIcon /> },
+  { text: 'Visualizations', path: '/visualizations', icon: <BarChartIcon /> },
 ];
 
 // Fixed drawer width - slightly more spacious

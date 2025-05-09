@@ -12,6 +12,7 @@ import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import DeleteIcon from '@mui/icons-material/Delete';
 import StarIcon from '@mui/icons-material/Star';
+import CheckIcon from '@mui/icons-material/Check';
 import { motion } from 'framer-motion';
 import { Document } from '../../services/documentService';
 import { DocumentOperationsProps } from '../../utils/myDocumentTypes';
@@ -29,12 +30,16 @@ interface DocumentListItemProps extends DocumentOperationsProps {
   document: Document;
   isFavorite: boolean;
   onContextMenu: (event: React.MouseEvent) => void;
+  onClick: () => void;
+  isSelected?: boolean;
 }
 
 const DocumentListItem: React.FC<DocumentListItemProps> = ({
   document: doc,
   isFavorite,
+  isSelected = false,
   onContextMenu,
+  onClick,
   onDownload,
   onDelete,
   onView,
@@ -43,28 +48,27 @@ const DocumentListItem: React.FC<DocumentListItemProps> = ({
   
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
+      exit={{ opacity: 0, y: 10 }}
       transition={{ duration: 0.2 }}
-      layout
     >
-      <Paper 
-        sx={{ 
-          mb: 2, 
-          p: 0,
+      <Paper
+        elevation={0}
+        sx={{
+          mb: 2,
           borderRadius: '12px',
           overflow: 'hidden',
-          boxShadow: 'none',
-          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          transition: 'all 0.3s ease',
-          backgroundColor: theme.palette.mode === 'dark'
-            ? alpha(theme.palette.background.paper, 0.8)
-            : theme.palette.background.paper,
+          position: 'relative',
+          border: isSelected 
+            ? `2px solid ${theme.palette.primary.main}`
+            : `1px solid ${theme.palette.divider}`,
+          boxShadow: isSelected
+            ? `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}`
+            : 'none',
+          transition: 'all 0.2s ease',
           '&:hover': {
-            boxShadow: theme.palette.mode === 'dark'
-              ? `0 8px 24px ${alpha(theme.palette.primary.main, 0.15)}`
-              : `0 8px 24px ${alpha(theme.palette.primary.main, 0.1)}`,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
             transform: 'translateY(-2px)',
             '& .list-item-actions': {
               opacity: 1,
@@ -73,7 +77,30 @@ const DocumentListItem: React.FC<DocumentListItemProps> = ({
           }
         }}
         onContextMenu={onContextMenu}
+        onClick={onClick}
       >
+               {isSelected && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              width: 24,
+              height: 24,
+              borderRadius: '50%',
+              bgcolor: 'primary.main',
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1,
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            }}
+          >
+            <CheckIcon fontSize="small" />
+          </Box>
+        )}
+
         <Box sx={{ p: 2, display: 'flex', alignItems: 'center' }}>
           {/* Document Icon */}
           <Box sx={{ 

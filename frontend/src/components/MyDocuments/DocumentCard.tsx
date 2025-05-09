@@ -16,6 +16,7 @@ import TableChartIcon from '@mui/icons-material/TableChart';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
+import CheckIcon from '@mui/icons-material/Check';
 import { motion } from 'framer-motion';
 import { Document } from '../../services/documentService';
 import { DocumentOperationsProps } from '../../utils/myDocumentTypes';
@@ -32,7 +33,9 @@ import {
 interface DocumentCardProps extends DocumentOperationsProps {
   document: Document;
   isFavorite: boolean;
-  onContextMenu: (event: React.MouseEvent) => void;
+  onContextMenu: (event: React.MouseEvent, docId: string) => void;
+  onClick: () => void;
+  isSelected?: boolean;
 }
 
 const DocumentCard: React.FC<DocumentCardProps> = ({
@@ -42,7 +45,9 @@ const DocumentCard: React.FC<DocumentCardProps> = ({
   onDownload,
   onView,
   onDetails,
-  onToggleFavorite
+  onToggleFavorite,
+  onClick,
+  isSelected = false
 }) => {
   const theme = useTheme();
   
@@ -63,26 +68,54 @@ const DocumentCard: React.FC<DocumentCardProps> = ({
           position: 'relative',
           overflow: 'visible',
           transition: 'all 0.3s ease',
-          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          border: isSelected ? `2px solid ${theme.palette.primary.main}` : 'none',
           background: theme.palette.mode === 'dark'
             ? `linear-gradient(145deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.7)} 100%)`
             : `linear-gradient(145deg, #fff 0%, #fafcfa 100%)`,
           backdropFilter: 'blur(10px)',
-          boxShadow: theme.palette.mode === 'dark'
-            ? '0 8px 32px rgba(0, 0, 0, 0.2)'
-            : '0 8px 32px rgba(0, 0, 0, 0.03)',
+          boxShadow: isSelected 
+            ? `0 0 0 2px ${theme.palette.primary.main}, 0 8px 32px rgba(0,0,0,0.2)` 
+            : theme.palette.mode === 'dark'
+              ? '0 8px 32px rgba(0, 0, 0, 0.2)'
+              : '0 8px 32px rgba(0, 0, 0, 0.03)',
           '&:hover': {
-            boxShadow: theme.palette.mode === 'dark'
-              ? `0 12px 40px ${alpha(theme.palette.primary.main, 0.3)}`
-              : `0 12px 40px ${alpha(theme.palette.primary.main, 0.15)}`,
+            boxShadow: isSelected 
+              ? `0 0 0 2px ${theme.palette.primary.main}, 0 12px 40px rgba(0,0,0,0.3)` 
+              : theme.palette.mode === 'dark'
+                ? `0 12px 40px ${alpha(theme.palette.primary.main, 0.3)}`
+                : `0 12px 40px ${alpha(theme.palette.primary.main, 0.15)}`,
             transform: 'translateY(-4px)',
             '& .document-actions': {
               opacity: 1,
             }
           }
         }}
-        onContextMenu={onContextMenu}
+        onContextMenu={e => onContextMenu(e, doc.id)}
+        onClick={onClick}
       > 
+        {/* Add an indicator for selected items */}
+        {isSelected && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: -8,
+              right: -8,
+              width: 24,
+              height: 24,
+              borderRadius: '50%',
+              bgcolor: 'primary.main',
+              color: 'primary.contrastText',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1,
+              boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
+            }}
+          >
+            <CheckIcon fontSize="small" />
+          </Box>
+        )}
+        
         {/* Document Type Indicator */}
         <Box sx={{ 
           display: 'flex',

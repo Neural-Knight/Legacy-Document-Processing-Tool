@@ -22,6 +22,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 
 import { ViewMode, FilterProcessed } from '../../utils/myDocumentTypes';
+import { useUpload } from '../../contexts/UploadContext';
 
 interface DocumentsControlPanelProps {
   searchQuery: string;
@@ -34,6 +35,7 @@ interface DocumentsControlPanelProps {
   refreshing: boolean;
   onRefresh: () => void;
   onUpload: () => void;
+  children?: React.ReactNode;
 }
 
 const DocumentsControlPanel: React.FC<DocumentsControlPanelProps> = ({
@@ -46,9 +48,15 @@ const DocumentsControlPanel: React.FC<DocumentsControlPanelProps> = ({
   onSortClick,
   refreshing,
   onRefresh,
-  onUpload
+  onUpload,
+  children 
 }) => {
   const theme = useTheme();
+  const { openUploadDialog } = useUpload();
+
+  const handleUploadClick = () => {
+    openUploadDialog();
+  };
 
   return (
     <Paper 
@@ -244,11 +252,14 @@ const DocumentsControlPanel: React.FC<DocumentsControlPanelProps> = ({
           </IconButton>
         </Tooltip>
         
+        {/* Render children before the Upload Button */}
+        {children}
+        
         {/* Upload Button */}
         <Button
           variant="contained"
           startIcon={<UploadFileIcon />}
-          onClick={onUpload}
+          onClick={handleUploadClick}
           sx={{ 
             height: 40,
             boxShadow: '0 4px 14px rgba(0, 0, 0, 0.1)',

@@ -1,17 +1,22 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Box, 
-  Alert, 
-  Snackbar, 
-  Chip, 
-  Typography, 
+import {
+  Box,
+  Alert,
+  Snackbar,
+  Chip,
+  Typography,
   Skeleton,
-  alpha, 
+  alpha,
   useTheme,
-  Fade
+  Fade,
+  Fab,
+  Button
 } from '@mui/material';
 import { AnimatePresence } from 'framer-motion';
+import ChatIcon from '@mui/icons-material/Chat';
+import CloseIcon from '@mui/icons-material/Close';
+import SelectAllIcon from '@mui/icons-material/SelectAll';
 
 // Components
 import DocumentsHeader from '../components/MyDocuments/DocumentsHeader';
@@ -26,17 +31,17 @@ import { SortMenu, FilterMenu, DocumentContextMenu } from '../components/MyDocum
 // API & Types
 import { Document, getAllDocuments, deleteDocument, downloadDocument } from '../services/documentService';
 import { getFavoriteDocuments, toggleFavoriteDocument } from '../services/dashboardService';
-import { 
-  ViewMode, 
-  SortBy, 
-  SortDirection, 
-  FilterProcessed, 
-  ContextMenuState 
+import {
+  ViewMode,
+  SortBy,
+  SortDirection,
+  FilterProcessed,
+  ContextMenuState
 } from '../utils/myDocumentTypes';
 
 // Helpers
 import { isProcessed, getOriginalName } from '../utils/documentHelpers.tsx';
-
+import { useUpload } from '../contexts/UploadContext';
 const MyDocumentsPage: React.FC = () => {
   // State management
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -55,20 +60,23 @@ const MyDocumentsPage: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<string>('');
   const [documentNameToDelete, setDocumentNameToDelete] = useState<string>('');
-  
+  const [selectedDocuments, setSelectedDocuments] = useState<Document[]>([]);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const navigate = useNavigate();
+
+  const { openUploadDialog, recentlyUploadedDocuments } = useUpload();
   // State for context menu
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  
+
   // State for sort menu
   const [sortAnchorEl, setSortAnchorEl] = useState<null | HTMLElement>(null);
   const sortMenuOpen = Boolean(sortAnchorEl);
-  
+
   // State for filter menu
   const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
   const filterMenuOpen = Boolean(filterAnchorEl);
-  
+
   const theme = useTheme();
-  const navigate = useNavigate();
 
   // Load documents on component mount
   useEffect(() => {
@@ -86,7 +94,7 @@ const MyDocumentsPage: React.FC = () => {
       setError('Failed to load favorite documents. Please try again.');
     }
   };
-  
+
 
   const loadDocuments = async () => {
     try {
@@ -112,7 +120,7 @@ const MyDocumentsPage: React.FC = () => {
   const handleDownload = async (doc: Document) => {
     try {
       console.log(doc);
-      await downloadDocument(doc.id, doc.file_path, getOriginalName(doc.filename),doc.file_type);
+      await downloadDocument(doc.id, doc.file_path, getOriginalName(doc.filename), doc.file_type);
     } catch (err) {
       console.error('Download failed:', err);
       setError('Failed to download document. Please try again.');
@@ -127,7 +135,7 @@ const MyDocumentsPage: React.FC = () => {
       setDeleteDialogOpen(true);
     }
   };
-  
+
   const handleDeleteConfirm = async () => {
     try {
       await deleteDocument(documentToDelete);
@@ -150,26 +158,26 @@ const MyDocumentsPage: React.FC = () => {
       setDeleteDialogOpen(false);
     }
   };
-  
+
   const handleDelete = (docId: string) => {
     showDeleteConfirmation(docId);
   };
 
   const toggleFavorite = async (docId: string) => {
     setContextMenu(null);
-    
+
     const isFavorite = favoriteDocuments.includes(docId);
-    
+
     try {
       // Call the API to update favorite status
       const success = await toggleFavoriteDocument(docId, !isFavorite);
-      
+
       if (success) {
         // Update local state to reflect the change
         const newFavorites = isFavorite
           ? favoriteDocuments.filter(id => id !== docId)
           : [...favoriteDocuments, docId];
-        
+
         setFavoriteDocuments(newFavorites);
       }
     } catch (err) {
@@ -184,10 +192,10 @@ const MyDocumentsPage: React.FC = () => {
     setContextMenu(
       contextMenu === null
         ? {
-            mouseX: event.clientX + 2,
-            mouseY: event.clientY - 6,
-            documentId,
-          }
+          mouseX: event.clientX + 2,
+          mouseY: event.clientY - 6,
+          documentId,
+        }
         : null,
     );
   };
@@ -279,7 +287,7 @@ const MyDocumentsPage: React.FC = () => {
       // Sort documents
       .sort((a, b) => {
         let comparison = 0;
-        
+
         switch (sortBy) {
           case 'date':
             comparison = new Date(a.upload_date).getTime() - new Date(b.upload_date).getTime();
@@ -294,7 +302,7 @@ const MyDocumentsPage: React.FC = () => {
             comparison = sizeA - sizeB;
             break;
         }
-        
+
         // Apply sort direction
         return sortDirection === 'asc' ? comparison : -comparison;
       });
@@ -320,6 +328,51 @@ const MyDocumentsPage: React.FC = () => {
     </Box>
   );
 
+  // Add useEffect to watch for uploads
+  useEffect(() => {
+    // When new documents are uploaded, refresh the documents list
+    if (recentlyUploadedDocuments.length > 0) {
+      loadDocuments();
+    }
+  }, [recentlyUploadedDocuments]);
+
+  // Document operations props that get passed to document components
+  const documentOperations = {
+    onDownload: handleDownload,
+    onDelete: handleDelete,
+    onView: (docId: string) => navigate(`/documents/${docId}`),
+    onDetails: openDetails,
+    onToggleFavorite: toggleFavorite
+  };
+
+  const toggleSelectionMode = () => {
+    setSelectionMode(prev => !prev);
+    if (selectionMode) {
+      setSelectedDocuments([]);
+    }
+  };
+
+  const handleDocumentSelect = (doc: Document) => {
+    if (selectionMode) {
+      setSelectedDocuments(prev => {
+        const isSelected = prev.some(d => d.id === doc.id);
+        return isSelected
+          ? prev.filter(d => d.id !== doc.id)
+          : [...prev, doc];
+      });
+    }
+  };
+  
+  const openChatWithDocuments = () => {
+    if (selectedDocuments.length === 0) return;
+
+    // Store selected document IDs in session storage
+    sessionStorage.setItem('chatDocuments', JSON.stringify(selectedDocuments.map(d => d.id)));
+
+    // Navigate to chat page
+    navigate('/query-agent');
+  };
+
   if (loading) {
     return (
       <Box sx={{ width: '100%', p: { xs: 1, sm: 2, md: 3 } }}>
@@ -332,25 +385,16 @@ const MyDocumentsPage: React.FC = () => {
     );
   }
 
-  // Document operations props that get passed to document components
-  const documentOperations = {
-    onDownload: handleDownload,
-    onDelete: handleDelete,
-    onView: (docId: string) => navigate(`/documents/${docId}`),
-    onDetails: openDetails,
-    onToggleFavorite: toggleFavorite
-  };
-
   return (
     <Box sx={{ width: '100%', p: { xs: 1, sm: 2, md: 3 } }}>
       <DocumentsHeader />
 
       {/* Error message */}
       {error && (
-        <Alert 
-          severity="error" 
-          sx={{ 
-            mb: 3, 
+        <Alert
+          severity="error"
+          sx={{
+            mb: 3,
             borderRadius: '12px',
             boxShadow: `0 4px 20px ${alpha(theme.palette.error.main, 0.15)}`
           }}
@@ -368,11 +412,11 @@ const MyDocumentsPage: React.FC = () => {
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
         TransitionComponent={Fade}
       >
-        <Alert 
-          onClose={handleSuccessClose} 
-          severity="success" 
+        <Alert
+          onClose={handleSuccessClose}
+          severity="success"
           variant="filled"
-          sx={{ 
+          sx={{
             width: '100%',
             borderRadius: '8px',
             boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
@@ -391,7 +435,7 @@ const MyDocumentsPage: React.FC = () => {
         onView={(docId) => navigate(`/documents/${docId}`)}
         onDelete={handleDelete}
       />
-      
+
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog
         open={deleteDialogOpen}
@@ -411,8 +455,21 @@ const MyDocumentsPage: React.FC = () => {
         onSortClick={handleSortClick}
         refreshing={refreshing}
         onRefresh={refreshDocuments}
-        onUpload={() => navigate('/upload')}
-      />
+        onUpload={openUploadDialog}
+      >
+        <Button
+          variant={selectionMode ? "contained" : "outlined"}
+          color={selectionMode ? "secondary" : "primary"}
+          startIcon={selectionMode ? <CloseIcon /> : <SelectAllIcon />}
+          onClick={toggleSelectionMode}
+          sx={{
+            height: 40,
+            boxShadow: selectionMode ? '0 4px 14px rgba(0, 0, 0, 0.15)' : 'none'
+          }}
+        >
+          {selectionMode ? 'Cancel Selection' : 'Select Documents'}
+        </Button>
+      </DocumentsControlPanel>
 
       {/* Sort Menu */}
       <SortMenu
@@ -466,15 +523,15 @@ const MyDocumentsPage: React.FC = () => {
 
       {/* No documents state */}
       {filteredAndSortedDocuments.length === 0 ? (
-        <DocumentsEmptyState 
-          searchQuery={searchQuery} 
-          onUpload={() => navigate('/upload')} 
+        <DocumentsEmptyState
+          searchQuery={searchQuery}
+          onUpload={openUploadDialog}
         />
       ) : (
         <>
           {/* Display status pills if filtering */}
           {(searchQuery || filterProcessed !== 'all') && (
-            <Box sx={{ 
+            <Box sx={{
               mb: 2,
               display: 'flex',
               flexWrap: 'wrap',
@@ -484,7 +541,7 @@ const MyDocumentsPage: React.FC = () => {
                 <Chip
                   label={`Search: "${searchQuery}"`}
                   onDelete={() => setSearchQuery('')}
-                  sx={{ 
+                  sx={{
                     borderRadius: '8px',
                     backgroundColor: alpha(theme.palette.primary.main, 0.1),
                     color: theme.palette.primary.main,
@@ -495,12 +552,12 @@ const MyDocumentsPage: React.FC = () => {
                   }}
                 />
               )}
-              
+
               {filterProcessed !== 'all' && (
                 <Chip
                   label={`Status: ${filterProcessed === 'processed' ? 'Processed' : 'Processing'}`}
                   onDelete={() => setFilterProcessed('all')}
-                  sx={{ 
+                  sx={{
                     borderRadius: '8px',
                     backgroundColor: alpha(
                       filterProcessed === 'processed' ? theme.palette.success.main : theme.palette.warning.main,
@@ -514,9 +571,9 @@ const MyDocumentsPage: React.FC = () => {
                   }}
                 />
               )}
-              
-              <Typography variant="body2" color="text.secondary" sx={{ 
-                display: 'flex', 
+
+              <Typography variant="body2" color="text.secondary" sx={{
+                display: 'flex',
                 alignItems: 'center',
                 ml: 1
               }}>
@@ -524,7 +581,7 @@ const MyDocumentsPage: React.FC = () => {
               </Typography>
             </Box>
           )}
-          
+
           {/* Documents List */}
           <AnimatePresence>
             {viewMode === 'grid' ? (
@@ -535,6 +592,8 @@ const MyDocumentsPage: React.FC = () => {
                       document={doc}
                       isFavorite={favoriteDocuments.includes(doc.id)}
                       onContextMenu={(e) => handleContextMenu(e, doc.id)}
+                      onClick={() => handleDocumentSelect(doc)}
+                      isSelected={selectionMode && selectedDocuments.some(d => d.id === doc.id)}
                       {...documentOperations}
                     />
                   </Box>
@@ -549,6 +608,8 @@ const MyDocumentsPage: React.FC = () => {
                     document={doc}
                     isFavorite={favoriteDocuments.includes(doc.id)}
                     onContextMenu={(e) => handleContextMenu(e, doc.id)}
+                    onClick={() => handleDocumentSelect(doc)}
+                    isSelected={selectionMode && selectedDocuments.some(d => d.id === doc.id)}
                     {...documentOperations}
                   />
                 ))}
@@ -556,6 +617,28 @@ const MyDocumentsPage: React.FC = () => {
             )}
           </AnimatePresence>
         </>
+      )}
+
+      {/* Bulk actions floating action button */}
+      {selectionMode && (
+        <Box sx={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2
+        }}>
+          <Fab
+            color="primary"
+            variant="extended"
+            onClick={openChatWithDocuments}
+            disabled={selectedDocuments.length === 0}
+          >
+            <ChatIcon sx={{ mr: 1 }} />
+            Chat with {selectedDocuments.length} document{selectedDocuments.length !== 1 ? 's' : ''}
+          </Fab>
+        </Box>
       )}
     </Box>
   );

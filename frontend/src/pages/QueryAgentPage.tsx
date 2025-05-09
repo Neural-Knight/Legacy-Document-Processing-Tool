@@ -50,6 +50,9 @@ import {
 } from '../services/chatStorageService';
 import ChatHistoryDrawer from '../components/QueryAgent/ChatHistoryDrawer';
 
+// Add these imports:
+import { useUpload } from '../contexts/UploadContext';
+
 // Define speech recognition type
 declare global {
     interface Window {
@@ -61,6 +64,7 @@ declare global {
 const QueryAgent: React.FC = () => {
     const navigate = useNavigate();
     const theme = useTheme();
+    const { openUploadDialog, recentlyUploadedDocuments } = useUpload();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [documents, setDocuments] = useState<Document[]>([]);
     const [inputMessage, setInputMessage] = useState('');
@@ -89,6 +93,9 @@ const QueryAgent: React.FC = () => {
     const [openTabs, setOpenTabs] = useState<ChatSession[]>([]);
     const [activeTabId, setActiveTabId] = useState<string | null>(null);
     const [initialized, setInitialized] = useState<boolean>(false);
+
+    // Add a new state for the empty documents warning
+    const [showEmptyDocsWarning, setShowEmptyDocsWarning] = useState(false);
 
     // Single unified initialization effect
     useEffect(() => {
@@ -445,8 +452,10 @@ const QueryAgent: React.FC = () => {
         try {
             const docs = await getAllDocuments();
             setDocuments(docs);
+            return docs; // Return the documents for chaining
         } catch (err) {
-            console.error(err);
+            console.error("Failed to load documents:", err);
+            return []; // Return empty array on error
         }
     };
     useEffect(() => {
@@ -541,11 +550,14 @@ const QueryAgent: React.FC = () => {
         return "I'll help you analyze that. Would you like to reference any specific documents from your library to inform my response?";
     };
 
+    // Modify the existing handleFileUpload function:
     const handleFileUpload = () => {
-        navigate('/upload');
+        openUploadDialog();
     };
 
+    // Update the handle document select function
     const handleDocumentSelect = (event: React.MouseEvent<HTMLElement>) => {
+        // Always show the document menu, even when empty
         setDocumentsAnchorEl(event.currentTarget);
     };
 
@@ -574,6 +586,11 @@ const QueryAgent: React.FC = () => {
 
     const handleCloseLimitWarning = () => {
         setShowLimitWarning(false);
+    };
+
+    // Add a handler to close the warning
+    const handleCloseEmptyDocsWarning = () => {
+        setShowEmptyDocsWarning(false);
     };
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -684,6 +701,74 @@ const QueryAgent: React.FC = () => {
             '100%': { boxShadow: '0 0 0 0 rgba(244, 67, 54, 0)' }
         }
     };
+
+    // Modify the useEffect that handles recentlyUploadedDocuments
+    useEffect(() => {
+        // When we have new uploaded documents, refresh the entire document list first
+        if (recentlyUploadedDocuments.length > 0) {
+            // First reload all documents to get fresh data
+            loadDocuments().then(() => {
+                // After documents are loaded, find the newly uploaded ones by ID
+                const uploadedDocs = documents.filter(doc => 
+                    recentlyUploadedDocuments.includes(doc.id)
+                );
+                
+                if (uploadedDocs.length > 0) {
+                    // Add them as references to the current chat
+                    setSelectedDocuments(prev => {
+                        const newDocs = [...prev];
+                        
+                        // Add each document that isn't already selected (up to max limit)
+                        uploadedDocs.forEach(doc => {
+                            if (!newDocs.find(d => d.id === doc.id) && newDocs.length < 3) {
+                                newDocs.push(doc);
+                            }
+                        });
+                        
+                        return newDocs;
+                    });
+                }
+            });
+        }
+    }, [recentlyUploadedDocuments]); // Remove documents dependency to prevent race conditions
+
+    // Add to the existing useEffect to check for documents in session storage:
+
+    useEffect(() => {
+        const checkForSharedDocuments = async () => {
+            const storedDocIds = sessionStorage.getItem('chatDocuments');
+            if (storedDocIds && documents.length > 0) {
+                try {
+                    const docIds = JSON.parse(storedDocIds);
+                    const docsToAdd = documents.filter(doc => docIds.includes(doc.id));
+                    
+                    if (docsToAdd.length > 0) {
+                        // Add documents as references (respecting the 3 document limit)
+                        setSelectedDocuments(prev => {
+                            const newDocs = [...prev];
+                            
+                            // Add documents up to the limit
+                            docsToAdd.forEach(doc => {
+                                if (!newDocs.find(d => d.id === doc.id) && newDocs.length < 3) {
+                                    newDocs.push(doc);
+                                }
+                            });
+                            
+                            return newDocs;
+                        });
+                        
+                        // Clear session storage
+                        sessionStorage.removeItem('chatDocuments');
+                    }
+                } catch (error) {
+                    console.error("Error processing shared documents:", error);
+                    sessionStorage.removeItem('chatDocuments');
+                }
+            }
+        };
+        
+        checkForSharedDocuments();
+    }, [documents]);
 
     return (
 
@@ -906,20 +991,29 @@ const QueryAgent: React.FC = () => {
                                     Select Documents
                                 </Typography>
                                 <Divider />
-                                {documents.map((doc) => (
-                                    <MenuItem
-                                        key={doc.id}
-                                        onClick={() => addDocumentReference(doc)}
-                                        sx={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 1,
-                                        }}
-                                    >
-                                        {getDocumentIcon(getOriginalName(doc.filename))}
-                                        <Typography variant="body2" noWrap>{getOriginalName(doc.filename)}</Typography>
-                                    </MenuItem>
-                                ))}
+                                
+                                {documents.length > 0 ? (
+                                    documents.map((doc) => (
+                                        <MenuItem
+                                            key={doc.id}
+                                            onClick={() => addDocumentReference(doc)}
+                                            sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1,
+                                            }}
+                                        >
+                                            {getDocumentIcon(getOriginalName(doc.filename))}
+                                            <Typography variant="body2" noWrap>{getOriginalName(doc.filename)}</Typography>
+                                        </MenuItem>
+                                    ))
+                                ) : (
+                                    <Box sx={{ p: 2, textAlign: 'center' }}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            No documents available. Please upload documents first.
+                                        </Typography>
+                                    </Box>
+                                )}
                             </Menu>
 
                             <input
@@ -1433,20 +1527,29 @@ const QueryAgent: React.FC = () => {
                             Select Documents
                         </Typography>
                         <Divider />
-                        {documents.map((doc) => (
-                            <MenuItem
-                                key={doc.id}
-                                onClick={() => addDocumentReference(doc)}
-                                sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 1,
-                                }}
-                            >
-                                {getDocumentIcon(getOriginalName(doc.filename))}
-                                <Typography variant="body2" noWrap>{getOriginalName(doc.filename)}</Typography>
-                            </MenuItem>
-                        ))}
+                        
+                        {documents.length > 0 ? (
+                            documents.map((doc) => (
+                                <MenuItem
+                                    key={doc.id}
+                                    onClick={() => addDocumentReference(doc)}
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 1,
+                                    }}
+                                >
+                                    {getDocumentIcon(getOriginalName(doc.filename))}
+                                    <Typography variant="body2" noWrap>{getOriginalName(doc.filename)}</Typography>
+                                </MenuItem>
+                            ))
+                        ) : (
+                            <Box sx={{ p: 2, textAlign: 'center' }}>
+                                <Typography variant="body2" color="text.secondary">
+                                    No documents available. Please upload documents first.
+                                </Typography>
+                            </Box>
+                        )}
                     </Menu>
 
                     <input
