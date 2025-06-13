@@ -13,7 +13,8 @@ from app.schemas.document import Document, DocumentCreate
 from app.core.config import settings
 from app.api.deps import get_current_user, get_current_active_user, get_current_active_superuser
 from app.models.user import User
-
+from app.models.extraction import Extraction
+from app.services.document_processor import document_processor
 from psycopg2.errors import UniqueViolation
 from sqlalchemy.exc import IntegrityError
 
@@ -32,62 +33,59 @@ async def upload_file(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)  # Require authenticated user
 ):
-    """
-    Upload a new file to the server.
-    
-    Requires authentication. The uploaded document will be associated with the current user.
-    """
-    logger.info(f"User {current_user.id} ({current_user.username}) is uploading file: {file.filename}")
-    
-    # Check file size
-    content = await file.read(settings.MAX_UPLOAD_SIZE * 1024 * 1024 + 1)
-    file_size = len(content)
-    
-    if file_size > settings.MAX_UPLOAD_SIZE * 1024 * 1024:
-        logger.warning(f"Upload attempt with oversized file ({file_size} bytes) by user {current_user.id}")
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File too large. Maximum size allowed is {settings.MAX_UPLOAD_SIZE}MB"
-        )
-    
-    # Reset file position for storage service to read it again
-    await file.seek(0)
-    
-    # Upload the file using the appropriate storage service
-    storage_service = get_storage_service()
-    try:
-        file_metadata = await storage_service.upload_file(file)
-        
-        # Add user ID to metadata to associate document with user
-        file_metadata["user_id"] = current_user.id
-        
-        # Save file metadata to database
-        try:
-            document = create_document(db, file_metadata)
-            logger.info(f"Document {document.id} successfully uploaded by user {current_user.id}")
-            return document
-        except IntegrityError as e:
-            # Check if it's a unique constraint violation
-            if isinstance(e.orig, UniqueViolation):
-                # Delete the file as we couldn't create the DB record
-                await storage_service.delete_file(file_metadata["file_path"])
-                logger.error(f"Unique constraint violation during upload by user {current_user.id}: {str(e)}")
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="A file with this path already exists."
-                )
-            logger.error(f"Database error during upload by user {current_user.id}: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database error: {str(e)}"
-            )
-    except Exception as e:
-        logger.error(f"Error uploading file by user {current_user.id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Could not upload file: {str(e)}"
-        )
+    """Upload a document and start content extraction"""
+    return await document_processor.process_document(file, current_user.id, db)
 
+# Get Extraction Status
+@router.get("/documents/{document_id}/extraction", response_model=Dict[str, Any])
+async def get_extraction_status(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get the extraction status and results for a document"""
+    # Verify user has access to this document
+    document = get_document(db, document_id)
+    if document.user_id != current_user.id and not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    
+    # Get extraction info
+    extraction = db.query(Extraction).filter(Extraction.document_id == document_id).first()
+    if not extraction:
+        raise HTTPException(status_code=404, detail="Extraction not found")
+    
+    return {
+        "status": extraction.status,
+        "extraction_date": extraction.extraction_date,
+        "error": extraction.error,
+        "content_available": extraction.status == "completed"
+    }
+
+# Get Extraction Content
+@router.get("/documents/{document_id}/content", response_model=Dict[str, Any])
+async def get_extraction_content(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get the extracted content for a document"""
+    # Verify user has access to this document
+    document = get_document(db, document_id)
+    if document.user_id != current_user.id and not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    
+    # Get extraction content
+    extraction = db.query(Extraction).filter(Extraction.document_id == document_id).first()
+    if not extraction:
+        raise HTTPException(status_code=404, detail="Extraction not found")
+    
+    if extraction.status != "completed":
+        return {
+            "status": extraction.status,
+            "message": f"Content extraction is {extraction.status}"
+        }
+    
+    return extraction.content
 
 #Get user's favorite documents
 @router.get("/documents/favorites",response_model=List[Document])
@@ -309,3 +307,89 @@ async def download_document(
         media_type=content_type,
         headers={'Content-Disposition': f'attachment; filename="{filename}"'}
     )
+
+# Get table markdown files
+@router.get("/documents/{document_id}/table-markdown", response_model=Dict[str, Any])
+async def get_table_markdown(
+    document_id: int,
+    page_number: int = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get the table markdown file for a specific page or all table markdown files"""
+    # Verify user has access to this document
+    document = get_document(db, document_id)
+    if document.user_id != current_user.id and not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    
+    # Get extraction to check status
+    extraction = db.query(Extraction).filter(Extraction.document_id == document_id).first()
+    if not extraction:
+        raise HTTPException(status_code=404, detail="Extraction not found")
+    
+    if extraction.status != "completed":
+        return {
+            "status": extraction.status,
+            "message": f"Content extraction is {extraction.status}"
+        }
+        
+    # Build the path to the tables directory
+    doc_id_str = str(document_id)
+    doc_folder = None
+    uploads_dir = os.path.abspath(os.path.join("uploads", "extractions"))
+    
+    # Find the document folder
+    for folder in os.listdir(uploads_dir):
+        if folder.startswith(f"doc_{doc_id_str}"):
+            doc_folder = folder
+            break
+    
+    if not doc_folder:
+        raise HTTPException(status_code=404, detail="Document extraction folder not found")
+    
+    tables_folder = os.path.join(uploads_dir, doc_folder)
+    for subfolder in os.listdir(tables_folder):
+        potential_tables_folder = os.path.join(tables_folder, subfolder, "tables")
+        if os.path.exists(potential_tables_folder):
+            tables_folder = potential_tables_folder
+            break
+    else:
+        # If no tables subfolder found
+        raise HTTPException(status_code=404, detail="Tables folder not found")
+            
+    # If page_number is specified, return just that markdown file
+    if page_number is not None:
+        markdown_file = os.path.join(tables_folder, f"p{page_number}.md")
+        if not os.path.exists(markdown_file):
+            raise HTTPException(status_code=404, detail=f"Markdown file for page {page_number} not found")
+            
+        try:
+            with open(markdown_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+                return {"page": page_number, "content": content}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error reading markdown file: {str(e)}")
+    
+    # Otherwise return all markdown files
+    result = {}
+    try:
+        for filename in os.listdir(tables_folder):
+            if filename.endswith('.md') and filename.startswith('p'):
+                try:
+                    # Extract page number from filename (p1.md -> 1)
+                    page_num = int(filename[1:-3])
+                    file_path = os.path.join(tables_folder, filename)
+                    
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        result[page_num] = content
+                except (ValueError, IndexError):
+                    # Skip files that don't match our naming convention
+                    continue
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading markdown files: {str(e)}")
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="No table markdown files found")
+        
+    return {"pages": result}

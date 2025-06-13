@@ -27,7 +27,6 @@ import UploadActions from '../FileUpload/UploadActions';
 // Import types and utilities
 import { FileUploadStatus } from '../../types/fileUploadtypes';
 import { calculateOverallProgress, isAnyFileUploading,isStatisticalDocument } from '../../utils/fileUploadUtils';
-
 // Dialog transition
 const Transition = React.forwardRef(function Transition(
   props: TransitionProps & {
@@ -329,6 +328,13 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
         }
       );
 
+      // Check if the result has an id
+      if (!result || !result.id) {
+        throw new Error('Invalid response from server - missing document ID');
+      }
+
+      console.log("Upload result:", result);
+
       // Mark as complete
       setFileStatuses(prev => {
         const newStatuses = [...prev];
@@ -351,9 +357,11 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
       
       return { success: true, fileIndex, documentId: result.id };
     } catch (err) {
-      // Handle error for this specific file
+      // Improved error handling
+      console.error(`Error uploading file ${file.name}:`, err);
       const errorMessage = err instanceof Error ? err.message : 'An error occurred during upload';
 
+      // Set file status to error
       setFileStatuses(prev => {
         const newStatuses = [...prev];
         const statusIndex = newStatuses.findIndex(s => s.fileIndex === fileIndex);
@@ -367,6 +375,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
         return newStatuses;
       });
 
+      setGlobalError(`Failed to upload ${file.name}: ${errorMessage}`);
       return { success: false, fileIndex, error: errorMessage };
     }
   };
@@ -412,6 +421,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
 
         // Notify parent component of successful uploads if callback exists
         if (onUploadComplete && documentIds.length > 0) {
+          console.log("Notifying about uploaded document IDs:", documentIds);
           // Wait a bit to show the success state before potentially closing
           setTimeout(() => {
             onUploadComplete(documentIds);

@@ -1,0 +1,36 @@
+/* Styling for markdown tables */
+.markdown-table-container {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+
+.markdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  margin-bottom: 16px;
+}
+
+.markdown-table th,
+.markdown-table td {
+  border: 1px solid #e0e0e0;
+  padding: 8px 16px;
+}
+
+.markdown-table th {
+  font-weight: bold;
+  background-color: #f5f5f5;
+  text-align: left;
+}
+
+.markdown-table tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+/* Prevent long content from breaking layout */
+.markdown-table td {
+  max-width: 300px;
+  white-space: normal;
+  word-break: break-word;
+}

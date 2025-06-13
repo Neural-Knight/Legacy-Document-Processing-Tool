@@ -108,6 +108,7 @@ export const uploadDocument = async (
   formData.append('file', file);
 
   try {
+    console.log('Uploading document:', file.name);
     const response = await authApi.post<Document>('/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -118,14 +119,17 @@ export const uploadDocument = async (
           const percentCompleted = Math.round(
             (progressEvent.loaded * 100) / progressEvent.total
           );
+          console.log(`Upload progress for ${file.name}: ${percentCompleted}%`);
           onUploadProgress?.(percentCompleted);
         }
       },
     });
+    console.log('Upload successful for:', file.name, response.data);
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
+    console.error('Upload error details:', error.response?.data || error.message);
     handleApiError(error, 'Failed to upload document');
-    throw new Error('Failed to upload document'); // This line is never reached but satisfies TypeScript
+    throw new Error(error.response?.data?.message || 'Failed to upload document');
   }
 };
 
@@ -251,5 +255,69 @@ export const downloadDocument = async (
   } catch (error) {
     handleApiError(error, 'Failed to download document');
     throw new Error('Failed to download document'); // This line is never reached but satisfies TypeScript
+  }
+};
+
+
+/**
+ * Get extraction status for a document
+ * @param documentId Document ID
+ * @returns Promise with extraction status info
+ */
+export const getExtractionStatus = async (documentId: string): Promise<any> => {
+  if (!isAuthenticated()) {
+    throw new Error('You must be logged in to view document extraction status');
+  }
+  
+  try {
+    const response = await authApi.get<any>(`/documents/${documentId}/extraction`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching extraction status:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch extraction status');
+  }
+};
+
+/**
+ * Get extracted content for a document
+ * @param documentId Document ID
+ * @returns Promise with extraction content
+ */
+export const getDocumentContent = async (documentId: string): Promise<any> => {
+  if (!isAuthenticated()) {
+    throw new Error('You must be logged in to view document content');
+  }
+  
+  try {
+    const response = await authApi.get<any>(`/documents/${documentId}/content`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching document content:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch document content');
+  }
+};
+
+/**
+ * Get table markdown content for a document
+ * @param documentId Document ID
+ * @param pageNumber Optional specific page number
+ * @returns Promise with the markdown content
+ */
+export const getTableMarkdown = async (documentId: string, pageNumber?: number): Promise<any> => {
+  if (!isAuthenticated()) {
+    throw new Error('You must be logged in to view document content');
+  }
+  
+  try {
+    const params: any = {};
+    if (pageNumber !== undefined) {
+      params.page_number = pageNumber;
+    }
+    
+    const response = await authApi.get<any>(`/documents/${documentId}/table-markdown`, { params });
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching table markdown content:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch table markdown content');
   }
 };

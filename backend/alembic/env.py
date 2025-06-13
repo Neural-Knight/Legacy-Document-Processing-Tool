@@ -11,6 +11,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from app.models.document import Document
 from app.models.user import User, RefreshToken  # Add the new auth models
 from app.models.user_favorite import UserFavorite
+from app.models.chat_session import ChatMessage,ChatSession
+from app.models.extraction import Extraction
+from app.models.vector_store import VectorEntry
 from app.db.session import Base
 from app.core.config import settings
 

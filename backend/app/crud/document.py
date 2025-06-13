@@ -6,6 +6,10 @@ from app.schemas.document import DocumentCreate
 from app.models.user_favorite import UserFavorite
 
 def create_document(db: Session, document_data: dict) -> Document:
+    """
+    Creates a new document in the database
+    Ensures required fields including user_id are set
+    """
     # Initialize document with basic attributes
     db_obj = Document(
         filename=document_data["filename"],
@@ -15,9 +19,15 @@ def create_document(db: Session, document_data: dict) -> Document:
         file_size=document_data["file_size"]
     )
     
-    # Add user_id if provided in document_data
+    # Make sure user_id is always set - this is critical
     if "user_id" in document_data:
         db_obj.user_id = document_data["user_id"]
+    else:
+        raise ValueError("user_id is required when creating a document")
+    
+    # Set status if provided
+    if "status" in document_data:
+        db_obj.status = document_data["status"]
     
     db.add(db_obj)
     db.commit()
@@ -102,3 +112,18 @@ def update_favorite_status(db: Session, user_id: int, document_id: int, is_favor
     
     # No change needed
     return True
+
+def document_belongs_to_user(db: Session, document_id: int, user_id: int) -> bool:
+    """
+    Check if a document belongs to a specific user
+    
+    Returns True if:
+    1. Document belongs to the user
+    2. User is a superuser (handled at the API level)
+    """
+    doc = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == user_id
+    ).first()
+    
+    return doc is not None

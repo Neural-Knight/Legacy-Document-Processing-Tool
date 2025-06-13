@@ -349,7 +349,7 @@ def process_markdown_directory(directory_path, output_file="CreateDB.sql", table
     
     Args:
         directory_path (str): Path to the directory containing markdown files
-        output_file (str): Name of the output SQL file (default: CreateDB.sql)
+        output_file (str): Name of the output SQL file (default: sql)
         table_name_prefix (str): Prefix to use for table names
     
     Returns:

@@ -29,6 +29,9 @@ const api = axios.create({
   },
 });
 
+// Export the api instance for use in other services
+export const authApi = api;
+
 // Add request interceptor to include token in API requests
 api.interceptors.request.use(
   (config) => {

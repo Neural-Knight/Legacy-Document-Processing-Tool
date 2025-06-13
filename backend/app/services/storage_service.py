@@ -8,7 +8,7 @@ import mimetypes
 from abc import ABC, abstractmethod
 import boto3
 from botocore.exceptions import ClientError
-
+from app.utils.id_utils import generate_document_id
 from app.core.config import settings
 
 class StorageService(ABC):
@@ -39,9 +39,9 @@ class LocalStorageService(StorageService):
     async def upload_file(self, file: UploadFile, folder: str = None) -> Dict[str, Any]:
         """Upload a file to local storage"""
         # Generate a unique filename to avoid collisions
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        unique_id = str(uuid4())[:8]
-        filename = f"{timestamp}_{unique_id}_{file.filename}"
+
+        unique_id = generate_document_id()
+        filename = f"{unique_id}_{file.filename}"
         
         # Determine the storage directory
         upload_dir = self.root_path

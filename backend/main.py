@@ -47,6 +47,8 @@ setup_middleware(app)
 # Include API routes
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
+
+
 # Error handlers
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):

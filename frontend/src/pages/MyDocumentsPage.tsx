@@ -29,7 +29,7 @@ import DeleteConfirmationDialog from '../components/MyDocuments/DeleteConfirmati
 import { SortMenu, FilterMenu, DocumentContextMenu } from '../components/MyDocuments/SortFilterMenus';
 
 // API & Types
-import { Document, getAllDocuments, deleteDocument, downloadDocument } from '../services/documentService';
+import { Document, getAllDocuments, deleteDocument, downloadDocument, getDocumentById } from '../services/documentService';
 import { getFavoriteDocuments, toggleFavoriteDocument } from '../services/dashboardService';
 import {
   ViewMode,
@@ -103,9 +103,11 @@ const MyDocumentsPage: React.FC = () => {
       const docs = await getAllDocuments();
       console.log('Documents from API:', docs);
       setDocuments(docs);
+      return docs;
     } catch (err) {
       console.error(err);
       setError('Failed to load documents. Please try again.');
+      return [];
     } finally {
       setLoading(false);
     }
@@ -332,9 +334,33 @@ const MyDocumentsPage: React.FC = () => {
   useEffect(() => {
     // When new documents are uploaded, refresh the documents list
     if (recentlyUploadedDocuments.length > 0) {
-      loadDocuments();
+      loadDocuments().then(() => {
+        // Start polling for status of each newly uploaded document
+        recentlyUploadedDocuments.forEach(docId => {
+          checkDocumentProcessingStatus(docId);
+        });
+      });
     }
   }, [recentlyUploadedDocuments]);
+
+  // Add this function to check document processing status periodically
+
+  const checkDocumentProcessingStatus = async (documentId: string) => {
+    try {
+      const doc = await getDocumentById(documentId);
+      console.log(`Document ${documentId} processing status:`, doc.processed ? 'Processed' : 'Processing');
+      
+      // If document is still processing and doesn't have an error, check again in 5 seconds
+      if (!doc.processed && !doc.processing_error) {
+        setTimeout(() => checkDocumentProcessingStatus(documentId), 5000);
+      } else {
+        // Refresh documents list when processing is complete
+        await loadDocuments();
+      }
+    } catch (err) {
+      console.error(`Error checking document status for ${documentId}:`, err);
+    }
+  };
 
   // Document operations props that get passed to document components
   const documentOperations = {

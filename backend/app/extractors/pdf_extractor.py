@@ -22,13 +22,13 @@ import shutil  # Import shutil for directory removal
 import argparse  # Import argparse for command-line arguments
 import sys  # Import sys for command-line arguments
 import time
-
+from app.utils.id_utils import generate_document_id
 # Handle imports differently when run as a script vs as a module
 if __name__ == "__main__":
     # When run as a script, add the parent directory to sys.path
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
     from .PdfProcessor import PDFProcessor
-    from services.md2sql import process_markdown_directory
+    from app.services.md2sql import process_markdown_directory
 else:
     # When imported as a module
     from .PdfProcessor import PDFProcessor
@@ -36,7 +36,7 @@ else:
     parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
     if parent_dir not in sys.path:
         sys.path.insert(0, parent_dir)
-    from services.md2sql import process_markdown_directory
+    from app.services.md2sql import process_markdown_directory
 
 # Configure logging
 logging.basicConfig(
@@ -81,8 +81,7 @@ class PdfContentExtractor:
         os.makedirs(self.base_output_folder, exist_ok=True)
         
         # Generate timestamp in base36
-        timestamp = int(time.time())  # Current Unix timestamp
-        timestamp_base36 = self.base36_encode(timestamp)
+        timestamp_base36 = generate_document_id()
 
         # Extract the filename without extension
         pdf_name = os.path.splitext(os.path.basename(self.pdf_path))[0]
