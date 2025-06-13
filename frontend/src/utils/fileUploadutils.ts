@@ -94,3 +94,22 @@ export const calculateOverallProgress = (fileStatuses: FileUploadStatus[]): numb
 export const isAnyFileUploading = (fileStatuses: FileUploadStatus[]): boolean => {
   return fileStatuses.some(status => status.uploading);
 };
+
+export const STATISTICAL_FILE_EXTENSIONS = [
+  // Spreadsheet formats
+  'xlsx', 'xls', 'csv', 
+  // Data formats
+  'json', 'xml',
+  // Document formats that may contain tables
+  'pdf'
+];
+
+/**
+ * Check if a file is a valid statistical document type
+ * @param file The file to check
+ * @returns Boolean indicating if the file is a valid statistical document
+ */
+export const isStatisticalDocument = (file: File): boolean => {
+  const extension = file.name.split('.').pop()?.toLowerCase() || '';
+  return STATISTICAL_FILE_EXTENSIONS.includes(extension);
+};

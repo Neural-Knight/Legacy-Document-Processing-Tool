@@ -22,7 +22,7 @@ import UploadProgress from '../components/FileUpload/UploadProgress';
 import UploadActions from '../components/FileUpload/UploadActions';
 // Import types and utilities
 import { FileUploadStatus } from '../types/fileUploadtypes';
-import { calculateOverallProgress, isAnyFileUploading } from '../utils/fileUploadUtils';
+import { calculateOverallProgress, isAnyFileUploading, isStatisticalDocument } from '../utils/fileUploadUtils';
 
 /**
  * Main component for the file upload page
@@ -282,6 +282,10 @@ const UploadPage: React.FC = () => {
     const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
     newFiles.forEach(file => {
+      if (!isStatisticalDocument(file)) {
+      errors.push(`${file.name} is not a supported statistical document format`);
+      return;
+    }
       // Check file size limit
       if (file.size > MAX_FILE_SIZE) {
         errors.push(`${file.name} exceeds 50MB size limit`);

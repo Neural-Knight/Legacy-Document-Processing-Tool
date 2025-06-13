@@ -26,7 +26,7 @@ import UploadActions from '../FileUpload/UploadActions';
 
 // Import types and utilities
 import { FileUploadStatus } from '../../types/fileUploadtypes';
-import { calculateOverallProgress, isAnyFileUploading } from '../../utils/fileUploadUtils';
+import { calculateOverallProgress, isAnyFileUploading,isStatisticalDocument } from '../../utils/fileUploadUtils';
 
 // Dialog transition
 const Transition = React.forwardRef(function Transition(
@@ -170,6 +170,11 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
     const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
     newFiles.forEach(file => {
+      // Check if file is a valid statistical document
+      if(!isStatisticalDocument(file)){
+        errors.push(`${file.name} is not a supported statistical document format`)
+        return
+      }
       // Check file size limit
       if (file.size > MAX_FILE_SIZE) {
         errors.push(`${file.name} exceeds 50MB size limit`);
@@ -524,8 +529,8 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
       <DialogContent sx={{ p: 3 }}>
         <Box sx={{ mb: 3 }}>
           <Typography variant="body1" color="text.secondary">
-            Upload any type of document for automated content extraction and analysis.
-            The system will process your documents and extract relevant information.
+            Upload statistical documents for automated content extraction and analysis.
+            Supported formats: Excel (.xlsx, .xls), CSV, PDF with tables.
           </Typography>
         </Box>
         
@@ -546,7 +551,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
             type="file"
             ref={fileInputRef}
             style={{ display: 'none' }}
-            accept="*/*" // Accept all file types
+            accept=".xlsx,.xls,.csv,.pdf,.json,.xml"
             onChange={handleFileChange}
             disabled={uploadingAny}
             multiple

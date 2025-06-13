@@ -173,7 +173,7 @@ const DragDropArea: React.FC<DragDropAreaProps> = ({
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             {files.length > 0 
               ? `${files.length} ${files.length === 1 ? 'file' : 'files'} selected` 
-              : 'All document types supported'}
+              : 'Supported formats: .pdf, .xlsx, .xls, .csv, .json, .xml'}
           </Typography>
           
           <Button
