@@ -14,7 +14,7 @@ from PIL import Image
 import queue
 import threading
 from dotenv import load_dotenv
-from google import genai
+import google.generativeai as genai
 import pathlib
 
 class ApiKeyManager:
