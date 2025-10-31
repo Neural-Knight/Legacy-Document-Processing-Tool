@@ -7,7 +7,7 @@ from app.db.session import Base
 
 
 # Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 class User(Base):
     __tablename__ = "users"

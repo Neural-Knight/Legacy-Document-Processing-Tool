@@ -17,9 +17,9 @@ class Settings(BaseSettings):
     
     # PostgreSQL Database settings
     POSTGRES_SERVER: str = "localhost"
-    POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "password"
-    POSTGRES_DB: str = "file_upload_db"
+    POSTGRES_USER: str = "legacydocumentmanager"
+    POSTGRES_PASSWORD: str = "malyadipjee2967pal"
+    POSTGRES_DB: str = "documentManager"
     POSTGRES_PORT: str = "5432"
     
     # File storage settings
@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     
     model_config = {
         "env_file": ".env",
+        "env_file_encoding": "utf-8",
         "case_sensitive": True,
         "extra": "ignore"  # This allows extra fields to be passed without errors
     }

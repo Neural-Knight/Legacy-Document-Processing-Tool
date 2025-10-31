@@ -29,10 +29,11 @@ class ApiKeyManager:
         self.last_request_time = {}
         self.request_interval = 0.2  # Minimum time between requests for the same key
         
-        # Initialize clients for all keys
-        self.clients = {}
+        # Initialize models for all keys
+        self.models = {}
         for key in api_keys:
-            self.clients[key] = genai.Client(api_key=key)
+            genai.configure(api_key=key)
+            self.models[key] = genai.GenerativeModel('gemini-2.0-flash')
             self.last_request_time[key] = 0  # Initialize last request time
             
         # Split keys into active and idle based on half of total keys
@@ -49,13 +50,13 @@ class ApiKeyManager:
             # Check if this thread already has a key assigned
             for key, assigned_thread in self.active_keys.items():
                 if assigned_thread == thread_id:
-                    return self.clients[key], key
+                    return self.models[key], key
             
             # Find an unassigned key
             for key, assigned_thread in self.active_keys.items():
                 if assigned_thread is None:
                     self.active_keys[key] = thread_id
-                    return self.clients[key], key
+                    return self.models[key], key
             
             # If no available keys in active set, wait for one from the idle queue
             logger = logging.getLogger("PDFProcessor")
@@ -72,11 +73,11 @@ class ApiKeyManager:
                     self.active_keys[active_key] = thread_id
                     self.active_keys[active_key] = idle_key
                     self.idle_keys_queue.put(active_key)
-                    return self.clients[idle_key], idle_key
+                    return self.models[idle_key], idle_key
             
             # If no free slot (shouldn't happen), create a new slot
             self.active_keys[idle_key] = thread_id
-            return self.clients[idle_key], idle_key
+            return self.models[idle_key], idle_key
     
     def release_client(self, key, thread_id):
         """Mark a client as not being used by the thread"""
@@ -109,7 +110,7 @@ class ApiKeyManager:
                         logger.info(f"Thread {thread_id} - New key was used recently ({elapsed:.2f}s ago)")
                     
                     logger.info(f"Thread {thread_id} rotated exhausted key with a new one")
-                    return self.clients[new_key], new_key
+                    return self.models[new_key], new_key
                 except queue.Empty:
                     # If no keys available, put the exhausted key back and let it cool down
                     self.active_keys[exhausted_key] = None
@@ -117,10 +118,10 @@ class ApiKeyManager:
                     logger.warning(f"No idle keys available, keeping exhausted key {exhausted_key}")
                     # Reset last request time to force a delay before reusing
                     self.last_request_time[exhausted_key] = time.time() - (self.request_interval / 2)
-                    return self.clients[exhausted_key], exhausted_key
+                    return self.models[exhausted_key], exhausted_key
         
         # Should not reach here
-        return self.clients[exhausted_key], exhausted_key
+        return self.models[exhausted_key], exhausted_key
 
 class PDFProcessor:
     """
@@ -603,9 +604,8 @@ class PDFProcessor:
             
             def api_call():
                 try:
-                    response = client.models.generate_content(
-                        model="gemini-2.0-flash",
-                        contents=[image, "This image probably contains a table.\n If it has one or more tables, start the response with \"## table_name\", where table_name is a descriptive title of the table in sql-compatible format within 50 characters.\nAfter that write this data's sql-style table in markdown. (Column headers in only small letters and underscores, no spaces)\nIntelligently decide the table name and column headers before writing to ensure all information is present. If you find any data inside the table not following the layout, you may intelligently make new column(s) as required, just make sure all information in the table is incorporated well in your response. Sometimes there are multiple rows of headers with merged cells, ensure that you understand the context, separate those columns and write meaningful column headers. If you think that the table(s) is/are too large to extract directly, you can begin your response with a short \"## Analysis\" section at the beginning with your analysis of the data and the columns you plan to make.\nIf there are multiple tables in the image, write them separately in thae same format.\nIf there are no tables in the image, just write \"NO TABLES FOUND\"\nYou don't have to add any extra spaces or dashes for formatting (use as less characters as possible), and use just |---| for row following header row.\nSpecial Instruction: If you find a heading (bold or just one line starkly different from the table), then that indicates the start of a new table with headers same as the previous table, so if you get such a scenario, write a new table, with that heading as part of the new table name.\n"])
+                    response = client.generate_content(
+                        [image, "This image probably contains a table.\n If it has one or more tables, start the response with \"## table_name\", where table_name is a descriptive title of the table in sql-compatible format within 50 characters.\nAfter that write this data's sql-style table in markdown. (Column headers in only small letters and underscores, no spaces)\nIntelligently decide the table name and column headers before writing to ensure all information is present. If you find any data inside the table not following the layout, you may intelligently make new column(s) as required, just make sure all information in the table is incorporated well in your response. Sometimes there are multiple rows of headers with merged cells, ensure that you understand the context, separate those columns and write meaningful column headers. If you think that the table(s) is/are too large to extract directly, you can begin your response with a short \"## Analysis\" section at the beginning with your analysis of the data and the columns you plan to make.\nIf there are multiple tables in the image, write them separately in thae same format.\nIf there are no tables in the image, just write \"NO TABLES FOUND\"\nYou don't have to add any extra spaces or dashes for formatting (use as less characters as possible), and use just |---| for row following header row.\nSpecial Instruction: If you find a heading (bold or just one line starkly different from the table), then that indicates the start of a new table with headers same as the previous table, so if you get such a scenario, write a new table, with that heading as part of the new table name.\n"])
                     response_queue.put(("success", response))
                 except Exception as e:
                     response_queue.put(("error", e))

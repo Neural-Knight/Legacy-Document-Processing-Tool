@@ -23,6 +23,7 @@ import argparse  # Import argparse for command-line arguments
 import sys  # Import sys for command-line arguments
 import time
 from app.utils.id_utils import generate_document_id
+from app.core.config import settings
 # Handle imports differently when run as a script vs as a module
 if __name__ == "__main__":
     # When run as a script, add the parent directory to sys.path
@@ -1050,19 +1051,12 @@ class PdfContentExtractor:
                 return
             
             # Get database connection parameters from environment
-            db_host = os.getenv("DB_HOST", "localhost")
-            db_port = os.getenv("DB_PORT", "5432")
-            db_name = os.getenv("DB_NAME", "documentManager")
-            db_user = os.getenv("DB_USER", "postgres")
-            db_pass = os.getenv("DB_PASS", "")
-            
-            # Connect to PostgreSQL
             conn = psycopg2.connect(
-                host=db_host,
-                port=db_port,
-                dbname=db_name,
-                user=db_user,
-                password=db_pass
+                host=settings.POSTGRES_SERVER,
+                database=settings.POSTGRES_DB,
+                user=settings.POSTGRES_USER,
+                password=settings.POSTGRES_PASSWORD,
+                port=settings.POSTGRES_PORT
             )
             
             # Create a cursor with autocommit mode

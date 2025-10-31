@@ -11,6 +11,7 @@ from botocore.exceptions import ClientError
 from app.utils.id_utils import generate_document_id
 from app.core.config import settings
 
+
 class StorageService(ABC):
     """Abstract base class for file storage services"""
     
@@ -51,8 +52,11 @@ class LocalStorageService(StorageService):
         
         # Get the file path
         file_path = os.path.join(upload_dir, filename)
-        relative_path = os.path.relpath(file_path, self.root_path)
-        
+        # Store path relative to root_path WITHOUT including root_path itself
+        if folder:
+            relative_path = os.path.join(folder, filename)
+        else:
+            relative_path = filename  # Just the filename, not the full path
         # Save the file
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)

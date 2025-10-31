@@ -20,3 +20,4 @@ opencv-python>=4.5.0  # For image processing
 pdf2image>=1.16.0  # For converting PDF to images
 google-generativeai>=0.2.3  # For Google Generative AI integration
 itsdangerous>=2.1.2  # For secure data serialization
+passlib[argon2]>=1.7.4  # For Argon2 password hashing

@@ -15,8 +15,6 @@ from app.api.deps import get_current_user, get_current_active_user, get_current_
 from app.models.user import User
 from app.models.extraction import Extraction
 from app.services.document_processor import document_processor
-from psycopg2.errors import UniqueViolation
-from sqlalchemy.exc import IntegrityError
 
 class FavoriteRequest(BaseModel):
     favorite: bool
@@ -283,6 +281,7 @@ async def download_document(
     
     # Get file from storage
     storage_service = get_storage_service()
+    # logger.info(f"Attempting to download file from {document.file_path}")
     file_content = await storage_service.get_file(document.file_path)
     
     if file_content is None:

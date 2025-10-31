@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import logging
-
+from contextlib import asynccontextmanager
 from app.api.routes import api_router
 from app.api.middleware import setup_middleware
 from app.core.config import settings
@@ -34,11 +34,22 @@ logger = logging.getLogger(__name__)
 # In production, you should use Alembic migrations instead
 Base.metadata.create_all(bind=engine)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting application")
+    yield
+    # Shutdown
+    logger.info("Shutting down application")
+
+
 # Create FastAPI app
 app = FastAPI(
     title="Legacy Document Manager APIs",
     description="API for uploading and managing legacy documents",
     version="1.0.0",
+    lifespan=lifespan
 )
 
 # Setup middleware with security enhancements
@@ -86,18 +97,13 @@ def root():
 def health_check():
     """Health check endpoint for monitoring systems"""
     return {"status": "healthy"}
-
-# Startup and shutdown events
-@app.on_event("startup")
-async def startup_event():
-    """Initialize application on startup"""
-    logger.info("Starting application")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup resources on shutdown"""
-    logger.info("Shutting down application")
     
 if __name__=="__main__":
     import uvicorn
-    uvicorn.run(app,host="0.0.0.0",port=8000)
+    uvicorn.run(
+        "main:app",  # Use string path for auto-reload
+        host="0.0.0.0",
+        port=8000,
+        reload=True,  # Enable auto-reload on file changes
+        reload_dirs=["app"]  # Watch the app directory for changes
+    )

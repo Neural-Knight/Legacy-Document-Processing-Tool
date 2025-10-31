@@ -39,7 +39,7 @@ class DocumentProcessor:
     async def process_document(self, file: UploadFile, user_id: int, db: Session) -> Document:
         """
         Process an uploaded document:
-        1. Save the file
+        1. Save the file using storage service
         2. Create document record
         3. Extract content asynchronously
         4. Return document info
@@ -52,25 +52,19 @@ class DocumentProcessor:
         if not await self._is_statistical_document(file):
             raise HTTPException(400, "File does not contain statistical data")
             
-        # Save file to disk
-        unique_id=generate_document_id()
-        filename = f"{unique_id}_{file.filename.replace(' ', '_')}"
-        file_path = os.path.join(self.uploads_dir, filename)
+        # Use storage service instead of direct file writing
+        upload_result = await self.storage_service.upload_file(file)
         
-        contents = await file.read()
-        with open(file_path, "wb") as f:
-            f.write(contents)
-            
         # Reset file position for potential reuse
         await file.seek(0)
         
         # Create document record
         doc_create = DocumentCreate(
-            filename=filename,
-            original_filename=file.filename,
-            file_path=file_path,
-            file_type=file.content_type,
-            file_size=str(len(contents)),
+            filename=upload_result["filename"],
+            original_filename=upload_result["original_filename"],
+            file_path=upload_result["file_path"],
+            file_type=upload_result["file_type"],
+            file_size=str(upload_result["file_size"]),
             user_id=user_id,
             status="uploaded"
         )
@@ -81,8 +75,11 @@ class DocumentProcessor:
         db.commit()
         db.refresh(db_doc)
         
+        # Get full path for extraction
+        full_path = os.path.join(self.storage_service.root_path, upload_result["file_path"])
+        
         # Start extraction in background
-        asyncio.create_task(self._extract_content(db_doc.id, file_path, db))
+        asyncio.create_task(self._extract_content(db_doc.id, full_path, db))
         
         # Return document info
         return Document.from_orm(db_doc)
