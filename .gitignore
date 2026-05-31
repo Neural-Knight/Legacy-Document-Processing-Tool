@@ -129,3 +129,5 @@ frontend/public/fallback-*.js
 
 # Security
 backend/superuser.py
+doc.md
+openapi.json
