@@ -38,7 +38,7 @@ services:
       - MAX_UPLOAD_SIZE=${MAX_UPLOAD_SIZE:-50}
     command: >
       bash -c "alembic upgrade head && 
-              uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+              uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
 
 volumes:
   postgres_data:
