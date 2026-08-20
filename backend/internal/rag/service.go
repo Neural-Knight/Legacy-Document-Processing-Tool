@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 
@@ -211,10 +212,15 @@ func (s *Service) generate(ctx context.Context, query string, chunks []repositor
 	}
 
 	if s.llm != nil && s.llm.Enabled() {
-		if text, err := s.llm.Generate(ctx, chatSystemPrompt, buildUserPrompt(query, chunks)); err == nil && strings.TrimSpace(text) != "" {
+		text, err := s.llm.Generate(ctx, chatSystemPrompt, buildUserPrompt(query, chunks))
+		if err == nil && strings.TrimSpace(text) != "" {
 			return text
 		}
-		// On LLM error/empty, fall through to the template (graceful degrade).
+		// On LLM error/empty, log and fall through to the template (graceful
+		// degrade). The error text never contains the API key.
+		if err != nil {
+			slog.Warn("chat LLM generation failed; using template response", slog.Any("error", err))
+		}
 	}
 	return templateResponse(chunks)
 }

@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -17,8 +18,8 @@ import (
 	"time"
 )
 
-// DefaultModel matches the extraction pipeline's model.
-const DefaultModel = "gemini-2.0-flash"
+// DefaultModel is used when no model is configured.
+const DefaultModel = "gemini-2.5-flash"
 
 // Client calls Gemini for text generation. When no keys are configured,
 // Enabled() is false and callers should fall back to a template response.
@@ -114,19 +115,22 @@ func (c *Client) Generate(ctx context.Context, systemPrompt, userPrompt string) 
 }
 
 func (c *Client) call(ctx context.Context, key string, body []byte) (string, error) {
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", c.model, key)
+	// The API key is sent in the x-goog-api-key header (never in the URL/query,
+	// so it can't leak into logs).
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", c.model)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", key)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("gemini status %d", resp.StatusCode)
+		return "", fmt.Errorf("gemini status %d: %s", resp.StatusCode, readErrorBody(resp.Body))
 	}
 	var out response
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
@@ -140,4 +144,11 @@ func (c *Client) call(ctx context.Context, key string, body []byte) (string, err
 		sb.WriteString(p.Text)
 	}
 	return sb.String(), nil
+}
+
+// readErrorBody reads up to 500 bytes of a non-2xx response body for
+// diagnostics. It never includes request headers, so the API key is not logged.
+func readErrorBody(r io.Reader) string {
+	b, _ := io.ReadAll(io.LimitReader(r, 500))
+	return strings.TrimSpace(string(b))
 }

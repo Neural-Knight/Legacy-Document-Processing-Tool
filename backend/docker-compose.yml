@@ -40,8 +40,11 @@ services:
         condition: service_completed_successfully
     ports:
       - "8000:8000"
-    # Load local .env as the single source of truth; explicit environment below
-    # overrides where a container-specific value is required (e.g. db host).
+    # .env is the single source of truth. App/model settings (GEMINI_KEYS,
+    # CHAT_MODEL, GEMINI_MODEL, CHUNK_*, etc.) come ONLY from env_file so a
+    # stray exported shell var can't override them via ${VAR} substitution.
+    # The `environment:` block below is limited to container-topology values
+    # (db host, bind address, storage path) that must differ inside Compose.
     env_file:
       - .env
     volumes:
@@ -51,20 +54,8 @@ services:
       - HOST=0.0.0.0
       - PORT=8000
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      - SECRET_KEY=${SECRET_KEY}
-      - ALGORITHM=${ALGORITHM:-HS256}
-      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
-      - REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-7}
-      - API_V1_STR=${API_V1_STR:-/api}
-      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
-      - MAX_UPLOAD_SIZE=${MAX_UPLOAD_SIZE:-50}
-      - STORAGE_TYPE=${STORAGE_TYPE:-local}
+      - STORAGE_TYPE=local
       - LOCAL_STORAGE_PATH=/app/uploads
-      # Chat/RAG needs Gemini keys on the API too (answer generation).
-      - GEMINI_KEYS=${GEMINI_KEYS:-}
-      - CHAT_MODEL=${CHAT_MODEL:-gemini-2.0-flash}
-      - CHUNK_SIZE=${CHUNK_SIZE:-1000}
-      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-200}
 
   # Document-processing worker. Shares the same image and the uploads volume as
   # the backend; runs the worker binary instead of the API. Claims jobs from the
@@ -80,23 +71,18 @@ services:
         condition: service_completed_successfully
     entrypoint: ["/usr/local/bin/worker"]
     restart: unless-stopped
+    # Same rule as backend: model/tuning settings (GEMINI_KEYS, GEMINI_MODEL,
+    # OCR_LANGUAGE, MAX_PAGE_WORKERS, CHUNK_*, job knobs) come ONLY from .env.
+    # GEMINI_MODEL controls the table-extraction model; empty GEMINI_KEYS →
+    # table extraction is skipped and text extraction still runs.
     env_file:
       - .env
     volumes:
       - uploads_data:/app/uploads
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      - STORAGE_TYPE=${STORAGE_TYPE:-local}
+      - STORAGE_TYPE=local
       - LOCAL_STORAGE_PATH=/app/uploads
-      - MAX_CONCURRENT_JOBS=${MAX_CONCURRENT_JOBS:-2}
-      - JOB_POLL_INTERVAL_MS=${JOB_POLL_INTERVAL_MS:-1000}
-      - JOB_LOCK_TIMEOUT_MINUTES=${JOB_LOCK_TIMEOUT_MINUTES:-120}
-      # GEMINI_KEYS empty → table extraction skipped; text extraction still runs.
-      - GEMINI_KEYS=${GEMINI_KEYS:-}
-      - OCR_LANGUAGE=${OCR_LANGUAGE:-eng}
-      - MAX_PAGE_WORKERS=${MAX_PAGE_WORKERS:-4}
-      - CHUNK_SIZE=${CHUNK_SIZE:-1000}
-      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-200}
 
 volumes:
   postgres_data:

@@ -50,12 +50,16 @@ type Config struct {
 	GeminiKeys     string // space-separated; empty = table extraction disabled
 	OCRLanguage    string // tesseract lang(s), default "eng"
 	MaxPageWorkers int    // bounded page concurrency for table/OCR work
+	GeminiModel    string // Gemini model for table extraction, default gemini-2.5-flash
 
 	// Indexing + chat
 	ChunkSize    int    // RAG chunk size, default 1000
 	ChunkOverlap int    // RAG chunk overlap, default 200
-	ChatModel    string // Gemini chat model, default gemini-2.0-flash
+	ChatModel    string // Gemini model for chat answers, default gemini-2.5-flash
 }
+
+// DefaultGeminiModel is the Gemini model used when no override is set.
+const DefaultGeminiModel = "gemini-2.5-flash"
 
 // Load reads configuration from the environment, applying defaults. It returns
 // an error only for values it cannot recover.
@@ -86,10 +90,11 @@ func Load() (*Config, error) {
 		GeminiKeys:     os.Getenv("GEMINI_KEYS"),
 		OCRLanguage:    getEnv("OCR_LANGUAGE", "eng"),
 		MaxPageWorkers: getEnvInt("MAX_PAGE_WORKERS", 4),
+		GeminiModel:    getEnv("GEMINI_MODEL", DefaultGeminiModel),
 
 		ChunkSize:    getEnvInt("CHUNK_SIZE", 1000),
 		ChunkOverlap: getEnvInt("CHUNK_OVERLAP", 200),
-		ChatModel:    getEnv("CHAT_MODEL", "gemini-2.0-flash"),
+		ChatModel:    getEnv("CHAT_MODEL", DefaultGeminiModel),
 	}
 
 	c.DatabaseURL = resolveDatabaseURL()
@@ -138,10 +143,11 @@ func LoadForWorker() (*Config, error) {
 		GeminiKeys:     os.Getenv("GEMINI_KEYS"),
 		OCRLanguage:    getEnv("OCR_LANGUAGE", "eng"),
 		MaxPageWorkers: getEnvInt("MAX_PAGE_WORKERS", 4),
+		GeminiModel:    getEnv("GEMINI_MODEL", DefaultGeminiModel),
 
 		ChunkSize:    getEnvInt("CHUNK_SIZE", 1000),
 		ChunkOverlap: getEnvInt("CHUNK_OVERLAP", 200),
-		ChatModel:    getEnv("CHAT_MODEL", "gemini-2.0-flash"),
+		ChatModel:    getEnv("CHAT_MODEL", DefaultGeminiModel),
 	}
 	if c.DatabaseURL == "" {
 		return nil, fmt.Errorf("database configuration missing: set DATABASE_URL or POSTGRES_* env vars")

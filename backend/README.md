@@ -114,6 +114,18 @@ Compose brings up Postgres, runs the Go `migrate` binary (which exits 0 on
 success), then starts the API on `:8000` **and** the worker. Both share the
 `uploads_data` volume for local storage.
 
+> **Gotcha:** model/key settings (`GEMINI_KEYS`, `GEMINI_MODEL`, `CHAT_MODEL`,
+> `CHUNK_*`) are sourced from `.env` via `env_file` only. An exported shell var
+> of the same name would otherwise win over `.env` in `${VAR}` substitution, so
+> run compose without such exports (e.g. `unset CHAT_MODEL GEMINI_MODEL`) and
+> pass `--env-file .env`:
+>
+> ```bash
+> unset CHAT_MODEL GEMINI_MODEL
+> docker compose --env-file .env up -d --build
+> docker compose exec backend printenv CHAT_MODEL GEMINI_MODEL   # → gemini-2.5-flash
+> ```
+
 ## Local end-to-end test (frontend + backend)
 
 Full manual smoke test with the React frontend talking to the Go stack:
@@ -202,10 +214,15 @@ tabular parsers are out of scope for Phase 3).
 
 | Var | Purpose | Default |
 |-----|---------|---------|
-| `GEMINI_KEYS` | Space-separated Gemini API keys (rotation); empty → tables skipped | *(empty)* |
+| `GEMINI_KEYS` | Space-separated Gemini API keys, no brackets (rotation); empty → tables skipped | *(empty)* |
+| `GEMINI_MODEL` | Gemini model for PDF table extraction (worker) | `gemini-2.5-flash` |
 | `OCR_LANGUAGE` | tesseract language(s), e.g. `eng` or `eng+hin` | `eng` |
 | `MAX_PAGE_WORKERS` | Bounded page concurrency for Gemini/OCR per document | `4` |
 | `JOB_LOCK_TIMEOUT_MINUTES` | Reclaim window (raised for long PDFs) | `120` |
+
+Google AI Studio keys (the `AQ.` format) are valid; put them space-separated in
+`GEMINI_KEYS` with no brackets. The key is sent in the `x-goog-api-key` request
+header (never in the URL), so it does not appear in logs.
 
 ### Worker dependencies
 
@@ -235,13 +252,15 @@ After a successful extraction the worker indexes the content for retrieval
    kwarg). The `vector` column stays NULL until Phase 6. Indexing failure is
    logged and does not fail the job (same best-effort policy as md2sql).
 2. **Retrieval** — `POST /api/chat` scores candidate chunks by keyword overlap
-   (filtered to `document_ids` when provided) and takes the top 5. Real vector
-   similarity is deferred to Phase 6.
+   (filtered to `document_ids` when provided) and takes the top 5. Vector
+   similarity search is not yet implemented.
 3. **Generation** — with `GEMINI_KEYS` set, the retrieved context + question are
-   sent to Gemini (`CHAT_MODEL`, default `gemini-2.0-flash`) via the shared
-   `internal/gemini` client (key rotation). With no keys, a Python-style template
-   response is returned. Either way the answer, `sources` (document_id as a
-   string to match the frontend), and `conversation_id` come back.
+   sent to Gemini (`CHAT_MODEL`, default `gemini-2.5-flash`) via the shared
+   `internal/gemini` client (key rotation). With no keys — or if the LLM call
+   fails — a template response over the retrieved chunks is returned (the
+   failure is logged at Warn, without the key). Either way the answer, `sources`
+   (document_id as a string to match the frontend), and `conversation_id` come
+   back.
 4. **Sessions** — a `chat_sessions` row is created (or resumed via
    `conversation_id`), and both user and assistant `chat_messages` are persisted;
    `/api/chat/sessions` and `/api/chat/{id}/history` read them back.
@@ -251,7 +270,7 @@ After a successful extraction the worker indexes the content for retrieval
 | Var | Purpose | Default |
 |-----|---------|---------|
 | `GEMINI_KEYS` | Reused for chat answers; empty → template response | *(empty)* |
-| `CHAT_MODEL` | Gemini model for chat | `gemini-2.0-flash` |
+| `CHAT_MODEL` | Gemini model for chat | `gemini-2.5-flash` |
 | `CHUNK_SIZE` | Indexer chunk size (chars) | `1000` |
 | `CHUNK_OVERLAP` | Indexer chunk overlap (chars) | `200` |
 

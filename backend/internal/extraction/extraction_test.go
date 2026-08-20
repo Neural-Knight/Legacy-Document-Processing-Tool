@@ -81,7 +81,7 @@ func TestParseMarkdownTablesNone(t *testing.T) {
 
 func TestGeminiDisabledWhenNoKeys(t *testing.T) {
 	t.Setenv("GEMINI_KEYS", "")
-	g := NewGeminiClient()
+	g := NewGeminiClient("")
 	if g.Enabled() {
 		t.Fatal("expected Gemini disabled when GEMINI_KEYS empty")
 	}
@@ -94,7 +94,7 @@ func TestGeminiDisabledWhenNoKeys(t *testing.T) {
 
 func TestGeminiEnabledWithKeys(t *testing.T) {
 	t.Setenv("GEMINI_KEYS", "key1 key2  key3")
-	g := NewGeminiClient()
+	g := NewGeminiClient("")
 	if !g.Enabled() {
 		t.Fatal("expected Gemini enabled with keys")
 	}

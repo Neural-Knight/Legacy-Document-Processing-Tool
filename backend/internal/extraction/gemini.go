@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -13,8 +14,8 @@ import (
 	"time"
 )
 
-// geminiModel is the model used for table extraction.
-const geminiModel = "gemini-2.0-flash"
+// defaultGeminiModel is used when the caller does not specify one.
+const defaultGeminiModel = "gemini-2.5-flash"
 
 // geminiPrompt is the table-extraction prompt: emit "## table_name"
 // + SQL-friendly markdown tables, or exactly "NO TABLES FOUND".
@@ -32,6 +33,7 @@ const geminiPrompt = `You are given an image of a document page. If it contains 
 // the pipeline skips table extraction gracefully.
 type GeminiClient struct {
 	keys       []string
+	model      string
 	http       *http.Client
 	maxRetries int
 
@@ -39,8 +41,12 @@ type GeminiClient struct {
 	idx int // round-robin key index
 }
 
-// NewGeminiClient reads GEMINI_KEYS from the environment (space-separated).
-func NewGeminiClient() *GeminiClient {
+// NewGeminiClient reads GEMINI_KEYS from the environment (space-separated) and
+// uses the given model (falling back to defaultGeminiModel when empty).
+func NewGeminiClient(model string) *GeminiClient {
+	if model == "" {
+		model = defaultGeminiModel
+	}
 	var keys []string
 	for _, k := range strings.Fields(os.Getenv("GEMINI_KEYS")) {
 		if k != "" {
@@ -49,6 +55,7 @@ func NewGeminiClient() *GeminiClient {
 	}
 	return &GeminiClient{
 		keys:       keys,
+		model:      model,
 		http:       &http.Client{Timeout: 50 * time.Second},
 		maxRetries: 10,
 	}
@@ -130,19 +137,22 @@ func (g *GeminiClient) ExtractTables(ctx context.Context, imagePath string) (str
 }
 
 func (g *GeminiClient) call(ctx context.Context, key string, body []byte) (string, error) {
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", geminiModel, key)
+	// The API key is sent in the x-goog-api-key header (never in the URL/query,
+	// so it can't leak into logs).
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", g.model)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", key)
 	resp, err := g.http.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("gemini status %d", resp.StatusCode)
+		return "", fmt.Errorf("gemini status %d: %s", resp.StatusCode, readErrorBody(resp.Body))
 	}
 	var out geminiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
@@ -165,4 +175,11 @@ func stripCodeFence(s string) string {
 	s = strings.TrimPrefix(s, "```")
 	s = strings.TrimSuffix(s, "```")
 	return strings.TrimSpace(s)
+}
+
+// readErrorBody reads up to 500 bytes of a non-2xx response body for
+// diagnostics. It never includes request headers, so the API key is not logged.
+func readErrorBody(r io.Reader) string {
+	b, _ := io.ReadAll(io.LimitReader(r, 500))
+	return strings.TrimSpace(string(b))
 }

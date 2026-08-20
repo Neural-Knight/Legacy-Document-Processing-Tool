@@ -56,7 +56,7 @@ func run(log *slog.Logger) error {
 	if extraction.PopplerAvailable() {
 		deps := extraction.Deps{
 			PDF:    extraction.NewPopplerEngine(),
-			Tables: extraction.NewGeminiClient(),
+			Tables: extraction.NewGeminiClient(cfg.GeminiModel),
 			OCR:    extraction.NewTesseractOCR(cfg.OCRLanguage),
 			Log:    log,
 		}
