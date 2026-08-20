@@ -1,32 +1,31 @@
-FROM python:3.9-slim
+# ---- Build stage ----
+FROM golang:1.26-alpine AS build
 
-WORKDIR /app
+WORKDIR /src
 
-# Install PostgreSQL client and other dependencies
-RUN apt-get update && apt-get install -y \
-    postgresql-client \
-    libgl1 \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender1 \
-    libxcb1 \
-    && rm -rf /var/lib/apt/lists/*
+# Cache module downloads.
+COPY go.mod go.sum ./
+RUN go mod download
 
-# Copy requirements file
-COPY requirements.txt .
-
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy the rest of the application
+# Build both binaries: the API server and the migration runner. Migrations are
+# embedded into the migrate binary (see migrations/embed.go), so no SQL files
+# need to ship in the runtime image.
 COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate
 
-# Create the uploads directory
-RUN mkdir -p uploads
+# ---- Runtime stage ----
+FROM alpine:3.20
 
-# Expose the port
+# TLS roots for any outbound HTTPS (e.g. future S3/Gemini); harmless otherwise.
+RUN apk add --no-cache ca-certificates && adduser -D -u 10001 appuser
+
+COPY --from=build /out/api /usr/local/bin/api
+COPY --from=build /out/migrate /usr/local/bin/migrate
+
+USER appuser
 EXPOSE 8000
 
-# Command to run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Default to the API server; the compose migrate service overrides the command
+# to run /usr/local/bin/migrate.
+ENTRYPOINT ["/usr/local/bin/api"]

@@ -131,3 +131,4 @@ frontend/public/fallback-*.js
 backend/superuser.py
 doc.md
 openapi.json
+MIGRATION.md
