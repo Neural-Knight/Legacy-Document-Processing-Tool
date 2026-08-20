@@ -31,8 +31,16 @@ type Config struct {
 	// CORS
 	CORSOrigins []string
 
-	// Uploads (parsed now for parity; enforced in later phases)
+	// Uploads
 	MaxUploadSizeMB int
+
+	// Storage
+	StorageType        string // "local" | "s3"
+	LocalStoragePath   string
+	S3BucketName       string
+	S3Region           string
+	AWSAccessKeyID     string
+	AWSSecretAccessKey string
 }
 
 // Load reads configuration from the environment, applying defaults that match
@@ -48,6 +56,13 @@ func Load() (*Config, error) {
 		AccessTokenExpireMinutes: getEnvInt("ACCESS_TOKEN_EXPIRE_MINUTES", 30),
 		RefreshTokenExpireDays:   getEnvInt("REFRESH_TOKEN_EXPIRE_DAYS", 7),
 		MaxUploadSizeMB:          getEnvInt("MAX_UPLOAD_SIZE", 50),
+
+		StorageType:        getEnv("STORAGE_TYPE", "local"),
+		LocalStoragePath:   getEnv("LOCAL_STORAGE_PATH", "./uploads"),
+		S3BucketName:       os.Getenv("S3_BUCKET_NAME"),
+		S3Region:           os.Getenv("S3_REGION"),
+		AWSAccessKeyID:     os.Getenv("AWS_ACCESS_KEY_ID"),
+		AWSSecretAccessKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
 	}
 
 	c.DatabaseURL = resolveDatabaseURL()

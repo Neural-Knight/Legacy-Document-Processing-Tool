@@ -23,6 +23,11 @@ RUN apk add --no-cache ca-certificates && adduser -D -u 10001 appuser
 COPY --from=build /out/api /usr/local/bin/api
 COPY --from=build /out/migrate /usr/local/bin/migrate
 
+# Local-storage upload directory (mounted as a volume in docker-compose).
+# Owned by appuser so the non-root process can write to it.
+RUN mkdir -p /app/uploads && chown -R appuser:appuser /app
+
+WORKDIR /app
 USER appuser
 EXPOSE 8000
 

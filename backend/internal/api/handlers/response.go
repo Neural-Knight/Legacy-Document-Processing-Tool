@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 )
 
@@ -10,6 +11,16 @@ func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+// decodeJSON decodes the request body into v.
+func decodeJSON(r *http.Request, v interface{}) error {
+	return json.NewDecoder(r.Body).Decode(v)
+}
+
+// copyStream streams src into w without buffering the whole payload.
+func copyStream(w io.Writer, src io.Reader) (int64, error) {
+	return io.Copy(w, src)
 }
 
 // errorResponse mirrors FastAPI's error body shape: {"detail": "..."}.

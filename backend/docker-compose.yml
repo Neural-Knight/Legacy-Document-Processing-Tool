@@ -41,6 +41,9 @@ services:
         condition: service_completed_successfully
     ports:
       - "8000:8000"
+    volumes:
+      # Persist locally-stored uploads across container restarts.
+      - uploads_data:/app/uploads
     environment:
       - HOST=0.0.0.0
       - PORT=8000
@@ -52,6 +55,9 @@ services:
       - API_V1_STR=${API_V1_STR:-/api}
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       - MAX_UPLOAD_SIZE=${MAX_UPLOAD_SIZE:-50}
+      - STORAGE_TYPE=${STORAGE_TYPE:-local}
+      - LOCAL_STORAGE_PATH=/app/uploads
 
 volumes:
   postgres_data:
+  uploads_data:

@@ -3,9 +3,11 @@
 Go rewrite of the Legacy Document Processing Tool backend — a modular monolith
 using chi, pgx/v5 + pgxpool, sqlc, log/slog, golang-jwt, and argon2.
 
-This is **Phase 0**: foundation, health probes, and full auth parity with the
-old Python/FastAPI service. Documents, upload, extraction, RAG, and the worker
-are intentionally not implemented yet (see `../MIGRATION.md`).
+Implemented so far (see `../MIGRATION.md`):
+- **Phase 0/0b**: foundation, health probes, full auth parity, pure-Go migrations.
+- **Phase 1**: document CRUD, favorites, streaming upload/download, local + S3
+  storage. Extraction/RAG/worker are still deferred (Phases 2–4); the
+  extraction endpoints return 404 stubs for now.
 
 ## Layout
 
@@ -17,13 +19,15 @@ backend/
 ├── internal/
 │   ├── config/              # env-based configuration
 │   ├── auth/                # argon2 hashing, JWT, refresh-token service
+│   ├── storage/             # ObjectStorage interface + local & S3 backends
+│   ├── documents/           # document domain service (id gen, validation, upload/delete)
 │   ├── api/
 │   │   ├── router.go        # chi routes
 │   │   ├── middleware/      # request id, logging, CORS, recovery
-│   │   └── handlers/        # auth + health handlers, auth middleware
+│   │   └── handlers/        # auth, health, document handlers, auth middleware
 │   └── repository/          # sqlc-generated queries + Migrate() helper
 ├── migrations/              # golang-migrate SQL (embedded); schema source of truth
-├── test/integration/        # end-to-end auth tests (build tag: integration)
+├── test/integration/        # end-to-end auth + document tests (build tag: integration)
 ├── Dockerfile               # Go multi-stage build (api + migrate binaries)
 ├── docker-compose.yml       # db + migrate (Go) + backend
 └── sqlc.yaml
@@ -97,7 +101,9 @@ To add a schema change, create a new numbered pair
 (`migrations/000002_<name>.up.sql` + `.down.sql`) and keep
 `internal/repository/schema.sql` in sync so sqlc generates matching types.
 
-## Endpoints (Phase 0)
+## Endpoints
+
+Health + auth (Phase 0):
 
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
@@ -113,8 +119,62 @@ To add a schema change, create a new numbered pair
 | GET | `/api/auth/me` | Bearer | current user |
 | PUT | `/api/auth/me` | Bearer | update profile / password |
 
+Documents + upload (Phase 1, all require Bearer auth):
+
+| Method | Path | Notes |
+|--------|------|-------|
+| POST | `/api/upload` | multipart `file`; 201 Document; 400 unsupported ext; 413 too large |
+| GET | `/api/documents` | `skip`, `limit`, `owned_only` (default true); superuser + `owned_only=false` → all |
+| GET | `/api/documents/favorites` | user's favorite documents |
+| GET | `/api/documents/{id}` | 404 not found / 403 not owner |
+| DELETE | `/api/documents/{id}` | 204; deletes file + row (CASCADE) |
+| GET | `/api/documents/{id}/download` | streams the file; ignores any `filePath` query param |
+| POST | `/api/documents/{id}/favorite` | body `{"favorite": bool}` → `{"success": true}` |
+| GET | `/api/documents/{id}/extraction` | **stub** → 404 until Phase 3 |
+| GET | `/api/documents/{id}/content` | **stub** → 404 until Phase 3 |
+| GET | `/api/documents/{id}/table-markdown` | **stub** → 404 until Phase 3 |
+
+Access control matches the Python backend: a user may act on their own
+documents; a superuser may act on any.
+
 Passwords are hashed with **argon2id** in passlib-compatible PHC format, so
 hashes created by the previous Python service remain verifiable.
+
+## Storage
+
+`STORAGE_TYPE` selects the backend:
+- `local` (default) — files under `LOCAL_STORAGE_PATH` (default `./uploads`),
+  keyed `{base36-timestamp}_{original-filename}`. Streamed via `io.Copy`.
+- `s3` — objects in `S3_BUCKET_NAME` (region/credentials from `S3_*` / `AWS_*`,
+  else the default AWS credential chain). Streamed via the managed uploader.
+
+Uploads are bounded by `MAX_UPLOAD_SIZE` (MB) using an `io.LimitReader`, so an
+oversized file is rejected (413) rather than buffered.
+
+### Smoke-test upload + download with curl
+
+```bash
+# 1. Register + login to get an access token.
+curl -s -X POST localhost:8000/api/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"demo","email":"demo@example.com","password":"Str0ngPass"}'
+
+TOKEN=$(curl -s -X POST localhost:8000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"demo","password":"Str0ngPass"}' | jq -r .access_token)
+
+# 2. Upload a file (multipart field must be named "file").
+echo "col1,col2
+1,2" > sample.csv
+curl -s -X POST localhost:8000/api/upload \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@sample.csv"          # → 201 with Document JSON (note the "id")
+
+# 3. List, then download by id (replace 1 with the returned id).
+curl -s localhost:8000/api/documents -H "Authorization: Bearer $TOKEN"
+curl -s localhost:8000/api/documents/1/download -H "Authorization: Bearer $TOKEN" -o out.csv
+diff sample.csv out.csv && echo "round-trip OK"
+```
 
 ## Tests
 
