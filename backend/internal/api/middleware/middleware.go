@@ -66,8 +66,8 @@ func Logger(log *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
-// CORS applies a configured allow-list with credentials support, matching the
-// Python backend's CORS behavior (specific origins, not "*").
+// CORS applies a configured allow-list with credentials support (specific
+// origins, not "*").
 func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 	allowed := make(map[string]bool, len(allowedOrigins))
 	for _, o := range allowedOrigins {

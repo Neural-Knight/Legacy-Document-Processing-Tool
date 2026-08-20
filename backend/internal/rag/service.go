@@ -109,7 +109,7 @@ func (s *Service) ProcessQuery(ctx context.Context, userID int32, isSuperuser bo
 		return nil, err
 	}
 
-	// 7) Update session.last_message (truncated like Python).
+	// 7) Update session.last_message (truncated).
 	last := responseText
 	if len(last) > 100 {
 		last = last[:100] + "..."
@@ -152,8 +152,8 @@ func (s *Service) resolveSession(ctx context.Context, userID int32, req Request)
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return repository.ChatSession{}, fmt.Errorf("get session: %w", err)
 		}
-		// Not found (or not owned) → fall through to create a new one, matching
-		// the Python behavior of creating a session when the id is unknown.
+		// Not found (or not owned) → fall through to create a new session when
+		// the id is unknown.
 	}
 
 	title := req.Message
@@ -204,7 +204,7 @@ func (s *Service) retrieve(ctx context.Context, query string, docIDs []int32) ([
 }
 
 // generate produces the answer. With an enabled LLM it builds a context prompt
-// from the chunks; otherwise it returns the Python-style template.
+// from the chunks; otherwise it returns the template answer.
 func (s *Service) generate(ctx context.Context, query string, chunks []repository.VectorEntry) string {
 	if len(chunks) == 0 {
 		return "I couldn't find any relevant information in the selected documents to answer your query."
@@ -244,7 +244,7 @@ func buildUserPrompt(query string, chunks []repository.VectorEntry) string {
 	return sb.String()
 }
 
-// templateResponse reproduces the Python stub answer from the chunks.
+// templateResponse builds a fallback answer from the chunks.
 func templateResponse(chunks []repository.VectorEntry) string {
 	var sb strings.Builder
 	sb.WriteString("Here's what I found in the documents:\n\n")

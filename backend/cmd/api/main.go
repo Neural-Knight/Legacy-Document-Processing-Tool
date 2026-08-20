@@ -1,5 +1,5 @@
 // Command api starts the HTTP server for the Legacy Document Processing Tool
-// Go backend (Phase 0: health + auth).
+// backend, serving the health and auth endpoints.
 package main
 
 import (
@@ -90,9 +90,8 @@ func run(log *slog.Logger) error {
 	}
 }
 
-// normalizeDSN accepts both the SQLAlchemy-style "postgresql://" scheme used by
-// the Python settings and the "postgres://" scheme; pgx understands both, so we
-// pass it through unchanged.
+// normalizeDSN accepts both the "postgresql://" and "postgres://" schemes; pgx
+// understands both, so we pass it through unchanged.
 func normalizeDSN(dsn string) string {
 	return dsn
 }

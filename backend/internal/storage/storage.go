@@ -1,7 +1,6 @@
 // Package storage abstracts object storage behind an ObjectStorage interface,
-// with local-filesystem and S3 implementations. It ports the behavior of the
-// Python app/services/storage_service.py, but streams data (io.Copy) instead
-// of buffering whole files in memory.
+// with local-filesystem and S3 implementations. It streams data (io.Copy)
+// rather than buffering whole files in memory.
 package storage
 
 import (
@@ -36,8 +35,8 @@ type ObjectStorage interface {
 // ErrNotFound is returned by Download when the object does not exist.
 var ErrNotFound = fmt.Errorf("object not found")
 
-// New returns the storage backend selected by STORAGE_TYPE ("local" | "s3"),
-// mirroring the Python get_storage_service() factory. Defaults to local.
+// New returns the storage backend selected by STORAGE_TYPE ("local" | "s3").
+// Defaults to local.
 func New(cfg *config.Config) (ObjectStorage, error) {
 	switch strings.ToLower(cfg.StorageType) {
 	case "s3":

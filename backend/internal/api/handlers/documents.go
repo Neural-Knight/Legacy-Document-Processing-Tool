@@ -18,9 +18,9 @@ import (
 	"github.com/legacy-document-processing-tool/backend/internal/storage"
 )
 
-// DocumentHandler serves /api/upload and /api/documents/* endpoints, porting
-// app/api/routes/documents.py. Auth is enforced by RequireAuth middleware;
-// ownership rules (owner OR is_superuser) are checked per-request.
+// DocumentHandler serves /api/upload and /api/documents/* endpoints. Auth is
+// enforced by RequireAuth middleware; ownership rules (owner OR is_superuser)
+// are checked per-request.
 type DocumentHandler struct {
 	queries         *repository.Queries
 	docs            *documents.Service
@@ -33,7 +33,7 @@ func NewDocumentHandler(queries *repository.Queries, docs *documents.Service, ex
 	return &DocumentHandler{queries: queries, docs: docs, extractionsRoot: extractionsRoot}
 }
 
-// ---- DTO (matches app/schemas/document.py Document shape) ----
+// ---- DTO (document response shape) ----
 
 type documentResponse struct {
 	ID               int32      `json:"id"`
@@ -41,7 +41,7 @@ type documentResponse struct {
 	OriginalFilename string     `json:"original_filename"`
 	FilePath         string     `json:"file_path"`
 	FileType         string     `json:"file_type"`
-	FileSize         string     `json:"file_size"` // string, matching Python
+	FileSize         string     `json:"file_size"` // serialized as a string
 	UploadDate       *time.Time `json:"upload_date"`
 	Processed        bool       `json:"processed"`
 	ProcessingError  *string    `json:"processing_error"`
@@ -195,8 +195,8 @@ func (h *DocumentHandler) DeleteDocument(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Download streams the stored file. Any filePath query param is ignored, as in
-// Python (GET /api/documents/{id}/download).
+// Download streams the stored file. Any filePath query param is ignored
+// (GET /api/documents/{id}/download).
 func (h *DocumentHandler) Download(w http.ResponseWriter, r *http.Request) {
 	user, ok := UserFromContext(r.Context())
 	if !ok {
@@ -288,8 +288,8 @@ func (h *DocumentHandler) ToggleFavorite(w http.ResponseWriter, r *http.Request)
 
 // ---- Extraction ----
 
-// GetExtractionStatus returns the extraction status for a document, matching
-// Python: {status, extraction_date, error, content_available}. 404 when no
+// GetExtractionStatus returns the extraction status for a document:
+// {status, extraction_date, error, content_available}. 404 when no
 // extraction row exists yet (GET /api/documents/{id}/extraction).
 func (h *DocumentHandler) GetExtractionStatus(w http.ResponseWriter, r *http.Request) {
 	user, ok := UserFromContext(r.Context())
@@ -323,8 +323,8 @@ func (h *DocumentHandler) GetExtractionStatus(w http.ResponseWriter, r *http.Req
 
 // GetExtractionContent returns the extracted content JSON. For a completed
 // extraction it returns the stored content: the flat structured PDF shape from
-// the Phase 3 extractor (document_type, title, author, pages[]...), or the
-// placeholder wrapper for non-PDF types. A not-yet-completed extraction returns
+// the extractor (document_type, title, author, pages[]...), or the placeholder
+// wrapper for non-PDF types. A not-yet-completed extraction returns
 // a status message; missing → 404 (GET /api/documents/{id}/content).
 func (h *DocumentHandler) GetExtractionContent(w http.ResponseWriter, r *http.Request) {
 	user, ok := UserFromContext(r.Context())
@@ -359,8 +359,8 @@ func (h *DocumentHandler) GetExtractionContent(w http.ResponseWriter, r *http.Re
 	}
 }
 
-// GetTableMarkdown returns the Gemini/pdfplumber table markdown for a document,
-// porting the Python behavior (GET /api/documents/{id}/table-markdown):
+// GetTableMarkdown returns the extracted table markdown for a document
+// (GET /api/documents/{id}/table-markdown):
 //   - requires an extraction row; if status != "completed" → 200 {status, message}
 //   - resolves files under {extractionsRoot}/doc_{id}*/**/tables/
 //   - ?page_number=N → {"page": N, "content": "<markdown>"}
@@ -443,8 +443,8 @@ func (h *DocumentHandler) GetTableMarkdown(w http.ResponseWriter, r *http.Reques
 
 var tableFileRe = regexp.MustCompile(`^p(\d+)\.md$`)
 
-// findTablesDir locates the tables directory for a document, matching the
-// Python search: {extractionsRoot}/doc_{id}*/<subdir>/tables/.
+// findTablesDir locates the tables directory for a document, searching
+// {extractionsRoot}/doc_{id}*/<subdir>/tables/.
 func (h *DocumentHandler) findTablesDir(docID int32) (string, error) {
 	root := h.extractionsRoot
 	entries, err := os.ReadDir(root)
@@ -501,7 +501,7 @@ func dirExists(p string) bool {
 
 // loadOwned fetches the {id} document and enforces owner-or-superuser access.
 // It writes the appropriate error (404 not found / 403 forbidden) and returns
-// found=false on failure. forbiddenMsg matches the Python per-route wording.
+// found=false on failure. forbiddenMsg is the per-route wording.
 func (h *DocumentHandler) loadOwned(w http.ResponseWriter, r *http.Request, user repository.User, forbiddenMsg string) (repository.Document, bool) {
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
@@ -524,7 +524,7 @@ func (h *DocumentHandler) loadOwned(w http.ResponseWriter, r *http.Request, user
 	return doc, true
 }
 
-// canAccess is the owner-OR-superuser rule from Python.
+// canAccess is the owner-OR-superuser rule.
 func canAccess(user repository.User, doc repository.Document) bool {
 	if isSuperuser(user) {
 		return true

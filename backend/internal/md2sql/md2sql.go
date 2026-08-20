@@ -1,7 +1,7 @@
-// Package md2sql ports backend/app/services/md2sql.py: it turns Gemini/pdfplumber
-// markdown tables (## header + pipe table) into CREATE TABLE + INSERT SQL, and
-// executes that SQL one statement at a time via pgx (never the whole file at
-// once). It is worker-only; raw SQL execution is never exposed over HTTP.
+// Package md2sql turns extracted markdown tables (## header + pipe table) into
+// CREATE TABLE + INSERT SQL, and executes that SQL one statement at a time via
+// pgx (never the whole file at once). It is worker-only; raw SQL execution is
+// never exposed over HTTP.
 package md2sql
 
 import (
@@ -12,9 +12,9 @@ import (
 
 // Table is one parsed markdown table ready to become SQL.
 type Table struct {
-	Name      string   // full sanitized table name (<= 63 chars)
-	Columns   []Column // ordered columns
-	Rows      [][]string
+	Name       string   // full sanitized table name (<= 63 chars)
+	Columns    []Column // ordered columns
+	Rows       [][]string
 	HasSynthID bool // true when a synthetic unique_id PK was prepended
 }
 
@@ -35,7 +35,7 @@ var (
 )
 
 // sanitizeIdent lowercases and replaces non-alphanumerics with underscores,
-// collapsing repeats and trimming — matching the Python regex behavior.
+// collapsing repeats and trimming.
 func sanitizeIdent(s string) string {
 	s = nonIdentRe.ReplaceAllString(s, "_")
 	s = underscoreRe.ReplaceAllString(s, "_")
@@ -45,13 +45,13 @@ func sanitizeIdent(s string) string {
 
 // MarkdownToSQL parses markdown into SQL statements. tableNamePrefix is prepended
 // to every table name (e.g. "{base36ts}_p1"); the result is
-// "{prefix}_{counter}_{description}" truncated to 63 chars, matching Python.
+// "{prefix}_{counter}_{description}" truncated to 63 chars.
 // It returns the parsed tables (for metadata) and the SQL statements
 // (CREATEs first, then INSERTs, as separate statements).
 func MarkdownToSQL(markdown, tableNamePrefix string) ([]Table, []string, error) {
 	var tables []Table
 
-	// Split on "## " section boundaries (Python: re.split(r'(?=^## )', ...)).
+	// Split on "## " section boundaries.
 	sections := sectionSplit.Split(markdown, -1)
 	counter := 0
 	for _, section := range sections {
@@ -235,8 +235,8 @@ func createTableSQL(t Table) string {
 }
 
 // insertSQL builds one INSERT statement per row. Values are literal-escaped
-// (numeric raw, empty→NULL, else single-quoted with '' escaping) — matching the
-// Python generator. Identifiers are quoted.
+// (numeric raw, empty→NULL, else single-quoted with ” escaping). Identifiers
+// are quoted.
 func insertSQL(t Table) []string {
 	colNames := make([]string, len(t.Columns))
 	for i, c := range t.Columns {

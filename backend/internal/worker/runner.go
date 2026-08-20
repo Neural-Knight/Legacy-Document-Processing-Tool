@@ -15,8 +15,7 @@ import (
 )
 
 // Runner polls the job queue and dispatches claimed jobs to the Processor with
-// bounded concurrency. It is a Phase 2 modular-monolith worker — no Redis, no
-// external queue.
+// bounded concurrency. It runs in-process — no Redis, no external queue.
 type Runner struct {
 	queries       *repository.Queries
 	processor     Processor

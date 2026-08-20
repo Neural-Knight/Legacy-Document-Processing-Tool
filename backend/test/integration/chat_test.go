@@ -14,7 +14,7 @@ import (
 	"github.com/legacy-document-processing-tool/backend/internal/repository"
 )
 
-// TestChatFlow exercises the Phase 4 RAG/chat pipeline end to end: upload a PDF,
+// TestChatFlow exercises the RAG/chat pipeline end to end: upload a PDF,
 // run extraction+indexing, confirm vector_entries exist, then chat and manage
 // sessions. With no GEMINI_KEYS the chat falls back to the template response —
 // still a valid 200 with a conversation_id.

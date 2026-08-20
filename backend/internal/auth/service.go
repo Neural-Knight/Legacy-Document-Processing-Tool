@@ -10,8 +10,7 @@ import (
 	"github.com/legacy-document-processing-tool/backend/internal/repository"
 )
 
-// Service bundles token issuance and the DB-backed refresh-token lifecycle,
-// porting the behavior of the Python app/core/security.py helpers.
+// Service bundles token issuance and the DB-backed refresh-token lifecycle.
 type Service struct {
 	queries *repository.Queries
 	tokens  *TokenService
@@ -25,8 +24,7 @@ func NewService(queries *repository.Queries, tokens *TokenService) *Service {
 // Tokens exposes the underlying token service (for access-token creation).
 func (s *Service) Tokens() *TokenService { return s.tokens }
 
-// CreateRefreshToken generates an opaque UUID refresh token and persists it,
-// matching create_refresh_token in Python.
+// CreateRefreshToken generates an opaque UUID refresh token and persists it.
 func (s *Service) CreateRefreshToken(ctx context.Context, userID int32, userAgent, ipAddress string, ttl time.Duration) (string, error) {
 	tokenStr := uuid.NewString()
 	expires := pgtype.Timestamptz{Time: time.Now().UTC().Add(ttl), Valid: true}

@@ -10,8 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Claims mirrors the Python token payload (app/schemas/user.py TokenPayload):
-// sub (user id as string), exp, iat, jti, type.
+// Claims is the JWT token payload: sub (user id as string), exp, iat, jti, type.
 type Claims struct {
 	Sub  string `json:"sub"`
 	Type string `json:"type"`
@@ -32,7 +31,7 @@ func NewTokenService(secret string, accessTTL time.Duration) *TokenService {
 }
 
 // CreateAccessToken issues a signed access token for the given user id,
-// reproducing the Python claim set: sub, exp, iat, jti, type="access".
+// with the claim set: sub, exp, iat, jti, type="access".
 func (s *TokenService) CreateAccessToken(userID int64) (string, error) {
 	now := time.Now().UTC()
 	claims := Claims{

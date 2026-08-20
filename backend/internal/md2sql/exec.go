@@ -19,10 +19,10 @@ var pageFileRe = regexp.MustCompile(`^p(\d+)\.md$`)
 // ProcessDirectory reads every tables/p{N}.md file in tablesDir, converts each
 // to SQL, executes the statements one at a time against the pool, and records
 // each created table in tables_metadata. tablePrefix is the base36-timestamp
-// prefix (Python passed "{timestamp}_"); we normalize trailing underscores.
+// prefix; we normalize trailing underscores.
 //
 // A per-file parse/exec error is logged via the returned error slice but does
-// not abort the whole directory (best-effort, matching the Python resilience).
+// not abort the whole directory (best-effort).
 // Returns the CreateDB.sql text that was executed (for on-disk parity) and any
 // non-fatal errors.
 func ProcessDirectory(ctx context.Context, pool *pgxpool.Pool, queries *repository.Queries, tablesDir, tablePrefix string, documentID int32) (string, []error) {
@@ -102,8 +102,8 @@ func ProcessDirectory(ctx context.Context, pool *pgxpool.Pool, queries *reposito
 }
 
 // executeStatements runs each statement individually inside a transaction so a
-// single bad row doesn't leave a half-loaded table. Statements are already
-// split (never a whole-file blob), unlike the Python single-execute path.
+// single bad row doesn't leave a half-loaded table. Statements are executed
+// individually, never as a whole-file blob.
 func executeStatements(ctx context.Context, pool *pgxpool.Pool, stmts []string) error {
 	if len(stmts) == 0 {
 		return nil

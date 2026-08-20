@@ -38,8 +38,7 @@ type chunk struct {
 // extraction content. Non-PDF placeholder content (no pages) produces no chunks
 // and is a no-op beyond the delete.
 //
-// Metadata is written to the message_metadata column (NOT "metadata" — the
-// Python code used the wrong kwarg; we fix it here).
+// Metadata is written to the message_metadata column (NOT "metadata").
 func (ix *Indexer) IndexDocument(ctx context.Context, queries *repository.Queries, doc repository.Document, extractionContent []byte) error {
 	var content extraction.StructuredContent
 	if err := json.Unmarshal(extractionContent, &content); err != nil {
@@ -76,8 +75,8 @@ func (ix *Indexer) IndexDocument(ctx context.Context, queries *repository.Querie
 	return nil
 }
 
-// buildChunks ports _create_semantic_chunks: per-page text chunks, a title
-// metadata chunk, and per-table chunks.
+// buildChunks produces the indexable chunks for a document: per-page text
+// chunks, a title metadata chunk, and per-table chunks.
 func (ix *Indexer) buildChunks(docID int32, docName string, content extraction.StructuredContent) []chunk {
 	var chunks []chunk
 

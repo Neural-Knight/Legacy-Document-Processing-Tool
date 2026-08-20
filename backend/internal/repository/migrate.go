@@ -15,9 +15,8 @@ import (
 // against the given database URL. It is a no-op (nil error) when the schema is
 // already at the latest version.
 //
-// The database URL may use the "postgresql://" scheme (as the Python settings
-// produced) or "postgres://"; both are normalized to the "pgx5://" driver that
-// golang-migrate expects.
+// The database URL may use the "postgresql://" or "postgres://" scheme; both
+// are normalized to the "pgx5://" driver that golang-migrate expects.
 func Migrate(databaseURL string) error {
 	src, err := iofs.New(migrations.FS, ".")
 	if err != nil {

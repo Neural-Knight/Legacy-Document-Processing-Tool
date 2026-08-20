@@ -48,6 +48,7 @@ import {
     updateChatSession,
     getAllChatSessions
 } from '../services/chatStorageService';
+import { sendChatMessage } from '../services/chatService';
 import ChatHistoryDrawer from '../components/QueryAgent/ChatHistoryDrawer';
 
 // Add these imports:
@@ -96,6 +97,9 @@ const QueryAgent: React.FC = () => {
 
     // Add a new state for the empty documents warning
     const [showEmptyDocsWarning, setShowEmptyDocsWarning] = useState(false);
+
+    // Error message from the backend chat API (shown in a snackbar).
+    const [chatError, setChatError] = useState<string | null>(null);
 
     // Single unified initialization effect
     useEffect(() => {
@@ -386,66 +390,62 @@ const QueryAgent: React.FC = () => {
         setEditedContent('');
     };
 
-    // Update handleEditSave to manually update openTabs
-    const handleEditSave = (messageId: string) => {
-        // Find the index of the message being edited
+    // Re-send an edited message: truncate the conversation to the edited message
+    // and request a fresh response from the backend.
+    const handleEditSave = async (messageId: string) => {
         const messageIndex = messages.findIndex(msg => msg.id === messageId);
         if (messageIndex === -1) return;
 
-        // Get a copy of only the messages up to and including the edited message
-        const updatedMessages = [...messages.slice(0, messageIndex)];
-
-        // Add the edited message
-        const editedMessage = {
+        const editedMessage: ChatMessage = {
             ...messages[messageIndex],
-            content: editedContent
+            content: editedContent,
         };
-        updatedMessages.push(editedMessage);
+        const updatedMessages = [...messages.slice(0, messageIndex), editedMessage];
+        const editedText = editedContent;
+        const referencedDocs = editedMessage.references || [];
 
-        // Update messages state with truncated conversation
         setMessages(updatedMessages);
-
-        // Exit edit mode
         setEditingMessageId(null);
         setEditedContent('');
-
-        // Show typing indicator
         setIsTyping(true);
 
-        // Generate new bot response
-        setTimeout(() => {
+        try {
+            const documentIds = referencedDocs.map(doc => String(doc.id));
+            const response = await sendChatMessage({
+                message: editedText,
+                document_ids: documentIds.length > 0 ? documentIds : undefined,
+                conversation_id: currentChatSession?.backendConversationId,
+            });
+
             const botResponse: ChatMessage = {
                 id: Date.now().toString(),
-                content: createBotResponse(editedContent, editedMessage.references || []),
-                sender: "bot",
+                content: response.response,
+                sender: 'bot',
                 timestamp: new Date(),
             };
 
             const finalMessages = [...updatedMessages, botResponse];
             setMessages(finalMessages);
-            setIsTyping(false);
 
-            // Update the current chat session and tabs
             if (currentChatSession && activeTabId) {
-                const updatedSession = {
+                const updatedSession: ChatSession = {
                     ...currentChatSession,
                     messages: finalMessages,
-                    lastUpdated: new Date()
+                    lastUpdated: new Date(),
+                    backendConversationId: response.conversation_id,
                 };
-
-                // First update the currentChatSession state
                 setCurrentChatSession(updatedSession);
-                
-                // Then update the openTabs array
                 setOpenTabs(prev =>
                     prev.map(tab => tab.id === updatedSession.id ? updatedSession : tab)
                 );
-                
-                // Save to storage
                 updateChatSession(updatedSession)
                     .catch(err => console.error('Failed to update chat after edit:', err));
             }
-        }, 1500);
+        } catch (error: any) {
+            setChatError(error?.message || 'Failed to get a response. Please try again.');
+        } finally {
+            setIsTyping(false);
+        }
     };
 
     const loadDocuments = async () => {
@@ -467,87 +467,76 @@ const QueryAgent: React.FC = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    // Update handleSendMessage to manually update openTabs
-    const handleSendMessage = () => {
+    // Send a message to the backend chat API and append the assistant's reply.
+    const handleSendMessage = async () => {
         if (inputMessage.trim() === '' && selectedDocuments.length === 0) return;
 
-        // Add user message
+        const messageText = inputMessage;
+        const referencedDocs = [...selectedDocuments];
+
+        // Add the user message immediately.
         const newUserMessage: ChatMessage = {
             id: Date.now().toString(),
-            content: inputMessage,
+            content: messageText,
             sender: 'user',
             timestamp: new Date(),
-            references: selectedDocuments.length > 0 ? [...selectedDocuments] : undefined
+            references: referencedDocs.length > 0 ? referencedDocs : undefined
         };
 
         const updatedMessages = [...messages, newUserMessage];
+        const isFirstMessage = messages.length === 0;
         setMessages(updatedMessages);
         setInputMessage('');
         setSelectedDocuments([]);
-
-        // Simulate bot typing
         setIsTyping(true);
 
-        // Simulate bot response after delay
-        setTimeout(() => {
+        try {
+            // document_ids must be string[] to match the API contract.
+            const documentIds = referencedDocs.map(doc => String(doc.id));
+            const response = await sendChatMessage({
+                message: messageText,
+                document_ids: documentIds.length > 0 ? documentIds : undefined,
+                conversation_id: currentChatSession?.backendConversationId,
+            });
+
             const botResponse: ChatMessage = {
                 id: (Date.now() + 1).toString(),
-                content: createBotResponse(inputMessage, selectedDocuments),
+                content: response.response,
                 sender: 'bot',
                 timestamp: new Date(),
             };
 
             const finalMessages = [...updatedMessages, botResponse];
             setMessages(finalMessages);
-            setIsTyping(false);
 
-            // Update the tab title based on the conversation content
+            // Persist messages, the backend conversation id, and (on the first
+            // message) a title derived from the user's input.
             if (currentChatSession && activeTabId) {
-                // If this is the first message, set the title based on user input
-                let updatedSession = {
+                const updatedSession: ChatSession = {
                     ...currentChatSession,
                     messages: finalMessages,
-                    lastUpdated: new Date()
+                    lastUpdated: new Date(),
+                    backendConversationId: response.conversation_id,
                 };
-                
-                if (messages.length === 0) {
-                    const titleText = inputMessage.length > 30
-                        ? inputMessage.substring(0, 27) + '...'
-                        : inputMessage;
-
-                    updatedSession.title = titleText;
+                if (isFirstMessage && messageText.trim() !== '') {
+                    updatedSession.title = messageText.length > 30
+                        ? messageText.substring(0, 27) + '...'
+                        : messageText;
                 }
 
-                // First update currentChatSession
                 setCurrentChatSession(updatedSession);
-                
-                // Then update openTabs
                 setOpenTabs(prev =>
                     prev.map(tab => tab.id === activeTabId ? updatedSession : tab)
                 );
-                
-                // Save to storage
                 updateChatSession(updatedSession)
                     .catch(err => console.error('Failed to update chat:', err));
             }
-        }, 1500);
-    };
-
-    // Simulate bot responses
-    const createBotResponse = (message: string, docs: Document[]): string => {
-        if (docs.length > 0) {
-            return `I've analyzed the ${docs.length} document(s) you provided. Here's what I found:\n\n${docs.map(doc => `In "${getOriginalName(doc.filename)}", I found relevant information about ${message.toLowerCase().includes('report') ? 'financial metrics and business performance' : 'the topics you requested'}. Would you like me to summarize specific sections?`).join('\n\n')}`;
+        } catch (error: any) {
+            // Surface the backend error and drop the typing indicator.
+            setChatError(error?.message || 'Failed to get a response. Please try again.');
+        } finally {
+            setIsTyping(false);
         }
-
-        if (message.toLowerCase().includes('hello') || message.toLowerCase().includes('hi')) {
-            return "Hello! I'm here to help you analyze your documents. Would you like to upload a file or reference documents from your library?";
-        }
-
-        if (message.toLowerCase().includes('document') || message.toLowerCase().includes('file')) {
-            return "You can select documents from your library by clicking the document icon in the input field, or upload new files using the attachment button.";
-        }
-
-        return "I'll help you analyze that. Would you like to reference any specific documents from your library to inform my response?";
     };
 
     // Modify the existing handleFileUpload function:
@@ -1590,6 +1579,23 @@ const QueryAgent: React.FC = () => {
                             You can select a maximum of 3 documents at a time for analysis.
                         </Typography>
                     </Box>
+                </Alert>
+            </Snackbar>
+            {/* Backend chat error message */}
+            <Snackbar
+                open={chatError !== null}
+                autoHideDuration={6000}
+                onClose={() => setChatError(null)}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert
+                    elevation={6}
+                    variant="filled"
+                    severity="error"
+                    onClose={() => setChatError(null)}
+                    sx={{ width: '100%' }}
+                >
+                    {chatError}
                 </Alert>
             </Snackbar>
             <FloatingActionButtons

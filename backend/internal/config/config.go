@@ -1,7 +1,5 @@
-// Package config loads application configuration from environment variables.
-//
-// Env var names mirror the Python backend's pydantic settings so the same
-// .env works for both: POSTGRES_* / DATABASE_URL, SECRET_KEY, API prefix, etc.
+// Package config loads application configuration from environment variables:
+// POSTGRES_* / DATABASE_URL, SECRET_KEY, API prefix, etc.
 package config
 
 import (
@@ -14,7 +12,7 @@ import (
 // Config holds all runtime configuration.
 type Config struct {
 	// API
-	APIPrefix   string // matches Python API_V1_STR, default "/api"
+	APIPrefix   string // API_V1_STR, default "/api"
 	ProjectName string
 	Host        string
 	Port        string
@@ -48,19 +46,19 @@ type Config struct {
 	JobLockTimeoutMinutes int
 	WorkerID              string
 
-	// Extraction (Phase 3)
+	// Extraction
 	GeminiKeys     string // space-separated; empty = table extraction disabled
 	OCRLanguage    string // tesseract lang(s), default "eng"
 	MaxPageWorkers int    // bounded page concurrency for table/OCR work
 
-	// Indexing + chat (Phase 4)
+	// Indexing + chat
 	ChunkSize    int    // RAG chunk size, default 1000
 	ChunkOverlap int    // RAG chunk overlap, default 200
 	ChatModel    string // Gemini chat model, default gemini-2.0-flash
 }
 
-// Load reads configuration from the environment, applying defaults that match
-// the Python backend. It returns an error only for values it cannot recover.
+// Load reads configuration from the environment, applying defaults. It returns
+// an error only for values it cannot recover.
 func Load() (*Config, error) {
 	c := &Config{
 		APIPrefix:                getEnv("API_V1_STR", "/api"),
@@ -99,9 +97,9 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("database configuration missing: set DATABASE_URL or POSTGRES_* env vars")
 	}
 
-	// SECRET_KEY must be provided explicitly. The Python default generated a
-	// random key per restart, which invalidated all tokens on every boot; we
-	// treat that as a misconfiguration and fail fast.
+	// SECRET_KEY must be provided explicitly. A random key generated per restart
+	// would invalidate all tokens on every boot; we treat a missing key as a
+	// misconfiguration and fail fast.
 	if c.SecretKey == "" {
 		return nil, fmt.Errorf("SECRET_KEY is required and must be set explicitly")
 	}
@@ -160,7 +158,7 @@ func defaultWorkerID() string {
 }
 
 // resolveDatabaseURL prefers an explicit DATABASE_URL, otherwise assembles one
-// from POSTGRES_* parts exactly like the Python Settings.DATABASE_URL property.
+// from the POSTGRES_* parts.
 func resolveDatabaseURL() string {
 	if url := os.Getenv("DATABASE_URL"); url != "" {
 		return url
@@ -181,8 +179,7 @@ func parseCORS(raw string) []string {
 	if raw == "" {
 		return nil
 	}
-	// Support JSON-array style ["a","b"] as well as comma-separated, matching
-	// the Python assemble_cors_origins validator.
+	// Support JSON-array style ["a","b"] as well as comma-separated origins.
 	if strings.HasPrefix(raw, "[") {
 		raw = strings.Trim(raw, "[]")
 		raw = strings.ReplaceAll(raw, "\"", "")

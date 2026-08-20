@@ -15,13 +15,13 @@ import (
 	"github.com/legacy-document-processing-tool/backend/internal/repository"
 )
 
-// AuthHandler serves the /api/auth/* endpoints, porting app/api/routes/auth.py.
+// AuthHandler serves the /api/auth/* endpoints.
 type AuthHandler struct {
 	queries              *repository.Queries
 	auth                 *auth.Service
 	accessTTL            time.Duration
 	refreshTTLRememberMe time.Duration // used when remember_me = true
-	refreshTTLDefault    time.Duration // 24h when remember_me = false (matches Python)
+	refreshTTLDefault    time.Duration // 24h when remember_me = false
 }
 
 // NewAuthHandler builds the auth handler with configured token lifetimes.
@@ -35,7 +35,7 @@ func NewAuthHandler(queries *repository.Queries, svc *auth.Service, accessMinute
 	}
 }
 
-// ---- DTOs (match app/schemas/user.py JSON shapes) ----
+// ---- DTOs (request/response JSON shapes) ----
 
 type userResponse struct {
 	ID          int32      `json:"id"`
@@ -76,7 +76,7 @@ func toUserResponse(u repository.User) userResponse {
 	return resp
 }
 
-// fullName reproduces the Python User.full_name property.
+// fullName joins the user's first and last name.
 func fullName(u repository.User) string {
 	if u.FirstName != nil && u.LastName != nil && *u.FirstName != "" && *u.LastName != "" {
 		return *u.FirstName + " " + *u.LastName
@@ -116,7 +116,7 @@ type updateMeRequest struct {
 	Password  *string `json:"password"`
 }
 
-// ---- Validation (matches pydantic validators in schemas/user.py) ----
+// ---- Validation ----
 
 var usernameRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
@@ -217,7 +217,7 @@ func (h *AuthHandler) LoginAccessToken(w http.ResponseWriter, r *http.Request) {
 	}
 	username := r.PostFormValue("username")
 	password := r.PostFormValue("password")
-	// OAuth2 form has no remember_me; Python uses full refresh expiry here.
+	// OAuth2 form has no remember_me; use the full refresh expiry here.
 	h.authenticateAndRespond(w, r, username, password, true)
 }
 
@@ -289,7 +289,7 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Token rotation: revoke old, mint new (matches Python).
+	// Token rotation: revoke old, mint new.
 	if _, err := h.auth.RevokeRefreshToken(ctx, req.RefreshToken); err != nil {
 		writeError(w, http.StatusInternalServerError, "Internal server error")
 		return
@@ -415,7 +415,7 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 
 // ---- helpers ----
 
-// lookupUser tries username first, then email (matches Python login logic).
+// lookupUser tries username first, then email.
 func (h *AuthHandler) lookupUser(ctx context.Context, identifier string) (repository.User, bool) {
 	if u, err := h.queries.GetUserByUsername(ctx, identifier); err == nil {
 		return u, true

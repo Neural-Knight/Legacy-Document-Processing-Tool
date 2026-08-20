@@ -1,6 +1,6 @@
--- Phase 2: PostgreSQL-backed job queue. This replaces Python's unsafe
--- asyncio.create_task(db_session) background extraction with a durable queue
--- claimed by a dedicated worker via FOR UPDATE SKIP LOCKED.
+-- PostgreSQL-backed job queue: a durable table of processing jobs claimed by a
+-- dedicated worker via FOR UPDATE SKIP LOCKED, with retry/backoff and stale-lock
+-- reclaim.
 
 BEGIN;
 

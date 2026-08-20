@@ -18,7 +18,7 @@ import (
 	"github.com/legacy-document-processing-tool/backend/internal/worker"
 )
 
-// runRealProcessorOnce claims the next due job and runs the Phase 3
+// runRealProcessorOnce claims the next due job and runs the real
 // RealProcessor (poppler PDF path, no Gemini/OCR) synchronously.
 func runRealProcessorOnce(t *testing.T, pool *pgxpool.Pool, localRoot string) bool {
 	t.Helper()

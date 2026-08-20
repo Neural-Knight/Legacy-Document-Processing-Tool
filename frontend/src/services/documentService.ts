@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { getOriginalName } from '../utils/documentHelpers';
 import { getAccessToken, isAuthenticated, refreshAuthToken } from '../services/authService';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api';
 
 // Define the structure of API error responses
 interface ApiErrorResponse {

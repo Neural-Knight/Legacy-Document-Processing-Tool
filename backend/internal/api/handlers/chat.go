@@ -14,9 +14,8 @@ import (
 	"github.com/legacy-document-processing-tool/backend/internal/repository"
 )
 
-// ChatHandler serves /api/chat and /api/chat/* endpoints. It fixes two Python
-// bugs: the route is mounted at /api/chat (not /api/api/chat), and message
-// metadata uses the message_metadata column.
+// ChatHandler serves the /api/chat and /api/chat/* endpoints for RAG chat and
+// session management.
 type ChatHandler struct {
 	queries *repository.Queries
 	rag     *rag.Service

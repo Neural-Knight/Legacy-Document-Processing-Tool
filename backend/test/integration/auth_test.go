@@ -9,10 +9,10 @@
 //	TEST_DATABASE_URL=postgres://user:pass@localhost:5432/documentManager \
 //	  go test -tags=integration ./test/integration/...
 //
-// The schema is applied by the Go migrations (golang-migrate) at test start —
-// no Alembic. The target database only needs to be reachable and empty (or
-// already at the latest migration; re-running is a no-op). Each test uses a
-// unique username/email so runs do not collide; created rows are cleaned up.
+// The schema is applied by the Go migrations (golang-migrate) at test start.
+// The target database only needs to be reachable and empty (or already at the
+// latest migration; re-running is a no-op). Each test uses a unique
+// username/email so runs do not collide; created rows are cleaned up.
 package integration
 
 import (

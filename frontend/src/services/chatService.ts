@@ -1,5 +1,10 @@
 import { authApi, isAuthenticated } from './authService';
 
+// The backend returns errors as { "detail": "..." }. Extract that message,
+// falling back to a legacy `message` field and then a default.
+const errorDetail = (error: any, fallback: string): string =>
+  error?.response?.data?.detail || error?.response?.data?.message || fallback;
+
 export interface ChatRequest {
   message: string;
   document_ids?: string[];
@@ -33,7 +38,7 @@ export const sendChatMessage = async (request: ChatRequest): Promise<ChatRespons
     return response.data;
   } catch (error: any) {
     console.error('Error sending chat message:', error);
-    throw new Error(error.response?.data?.message || 'Failed to send message');
+    throw new Error(errorDetail(error, 'Failed to send message'));
   }
 };
 
@@ -52,7 +57,7 @@ export const getChatHistory = async (conversationId: string): Promise<any> => {
     return response.data;
   } catch (error: any) {
     console.error('Error fetching chat history:', error);
-    throw new Error(error.response?.data?.message || 'Failed to fetch chat history');
+    throw new Error(errorDetail(error, 'Failed to fetch chat history'));
   }
 };
 
@@ -70,7 +75,7 @@ export const getChatSessions = async (): Promise<any> => {
     return response.data;
   } catch (error: any) {
     console.error('Error fetching chat sessions:', error);
-    throw new Error(error.response?.data?.message || 'Failed to fetch chat sessions');
+    throw new Error(errorDetail(error, 'Failed to fetch chat sessions'));
   }
 };
 
@@ -89,6 +94,6 @@ export const deleteChatSession = async (conversationId: string): Promise<boolean
     return true;
   } catch (error: any) {
     console.error('Error deleting chat session:', error);
-    throw new Error(error.response?.data?.message || 'Failed to delete chat session');
+    throw new Error(errorDetail(error, 'Failed to delete chat session'));
   }
 };

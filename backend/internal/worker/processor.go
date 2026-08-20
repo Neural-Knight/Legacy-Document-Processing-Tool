@@ -1,7 +1,6 @@
 // Package worker contains the document-processing worker: the job Processor
-// interface and the Phase 2 StubProcessor, which performs the status
-// transitions and writes a placeholder extraction WITHOUT running any real
-// extraction (Gemini/fitz/OCR/md2sql are deferred to Phase 3).
+// interface and the StubProcessor, which performs the status transitions and
+// writes a placeholder extraction WITHOUT running any real extraction.
 package worker
 
 import (
@@ -20,7 +19,7 @@ type Processor interface {
 	Process(ctx context.Context, job repository.ProcessingJob, doc repository.Document) error
 }
 
-// StubProcessor implements the Phase 2 placeholder pipeline:
+// StubProcessor implements the placeholder pipeline:
 //
 //	document status → "processing"
 //	write an extractions row with placeholder content (status="completed")
@@ -51,7 +50,7 @@ func (p *StubProcessor) Process(ctx context.Context, job repository.ProcessingJo
 	}
 
 	// 3) Replace any existing extraction row, then insert the placeholder with
-	//    status="completed" (matches Python, which set completed on success).
+	//    status="completed" on success.
 	if err := p.queries.DeleteExtractionsByDocumentID(ctx, doc.ID); err != nil {
 		return fmt.Errorf("clear extractions: %w", err)
 	}
@@ -95,8 +94,8 @@ func fileExt(doc repository.Document) string {
 }
 
 // placeholderContent returns the JSON stored in extractions.content. The shape
-// mirrors the Python document_processor placeholders (metadata + content +
-// extraction_status), with a note that real extraction is deferred.
+// is metadata + content + extraction_status, with a note that real extraction
+// is deferred.
 func placeholderContent(doc repository.Document) ([]byte, error) {
 	filename := ""
 	if doc.OriginalFilename != nil {
@@ -116,7 +115,7 @@ func placeholderContent(doc repository.Document) ([]byte, error) {
 			"file_type": fileTypeLabel,
 		},
 		"content": map[string]any{
-			"message": "Extraction deferred to Phase 3",
+			"message": "Content extraction is implemented as a placeholder",
 		},
 		"extraction_status": "placeholder",
 	}

@@ -7,10 +7,9 @@ import (
 )
 
 // PlaceholderContent returns the raw JSON stored for non-PDF file types
-// (csv, xlsx, xls, json, xml), matching the Python document_processor
-// placeholder wrappers exactly ({metadata, content:{message,file_path},
-// extraction_status:"placeholder"}). Real parsers for these types are out of
-// scope (Phase 3 focuses on PDF).
+// (csv, xlsx, xls, json, xml): {metadata, content:{message,file_path},
+// extraction_status:"placeholder"}. Real parsers for these types are not yet
+// implemented; extraction currently focuses on PDF.
 func PlaceholderContent(originalFilename, filePath string) []byte {
 	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(originalFilename)), ".")
 

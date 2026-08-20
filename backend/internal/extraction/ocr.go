@@ -9,8 +9,8 @@ import (
 
 // TesseractOCR shells out to the `tesseract` binary. If tesseract is not
 // installed, Available() returns false and the pipeline skips OCR (scanned
-// pages get empty text but the job still completes), matching the Python
-// behavior of degrading gracefully when OCR deps are missing.
+// pages get empty text but the job still completes), degrading gracefully when
+// OCR deps are missing.
 type TesseractOCR struct {
 	lang string
 }

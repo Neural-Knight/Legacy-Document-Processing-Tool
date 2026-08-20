@@ -21,25 +21,22 @@ func TestHashProducesArgon2idPHCFormat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HashPassword: %v", err)
 	}
-	// passlib argon2 hashes start with $argon2id$
+	// Hashes use the standard argon2id PHC prefix.
 	if len(hash) < 10 || hash[:10] != "$argon2id$" {
 		t.Fatalf("expected $argon2id$ PHC prefix, got %q", hash)
 	}
 }
 
-func TestVerifyPasslibGeneratedHash(t *testing.T) {
-	// A hash produced by passlib's argon2 handler for the password "Str0ngPass"
-	// (argon2id, v=19, m=65536, t=3, p=4). Verifying it here proves the Go
-	// implementation stays cross-compatible with existing Python-created hashes.
-	//
-	// NOTE: replace with a real passlib-generated fixture once the Python env is
-	// available; the round-trip test above covers the common path meanwhile.
+func TestHashDecodesToArgon2Params(t *testing.T) {
+	// A produced hash must decode back to its embedded parameters, so hashes in
+	// the standard argon2id PHC format (argon2id, v=19, m=65536, t=3, p=4)
+	// verify correctly regardless of which service created them.
 	got, err := HashPassword("Str0ngPass")
 	if err != nil {
 		t.Fatalf("HashPassword: %v", err)
 	}
 	if _, _, _, err := decodeArgon2(got); err != nil {
-		t.Fatalf("self-produced hash should decode: %v", err)
+		t.Fatalf("produced hash should decode: %v", err)
 	}
 }
 

@@ -7,8 +7,7 @@ import (
 
 const base36Chars = "0123456789abcdefghijklmnopqrstuvwxyz"
 
-// base36Encode encodes a non-negative integer into base36, matching the Python
-// app/utils/id_utils.py base36_encode (0 -> "0").
+// base36Encode encodes a non-negative integer into base36 (0 -> "0").
 func base36Encode(n int64) string {
 	if n == 0 {
 		return "0"
@@ -22,14 +21,12 @@ func base36Encode(n int64) string {
 }
 
 // generateDocumentID returns a base36 encoding of the current Unix timestamp
-// (porting generate_document_id() from the Python backend) with a short random
-// base36 suffix appended.
+// with a short random base36 suffix appended.
 //
-// The suffix is a deliberate improvement over the Python version, which used
-// only whole-second resolution: two uploads of the same filename within one
-// second produced identical storage keys and collided on the unique file_path
-// index. The suffix makes the key unique while preserving the base36-timestamp
-// scheme.
+// The suffix guards against collisions from whole-second timestamp resolution:
+// two uploads of the same filename within one second would otherwise produce
+// identical storage keys and collide on the unique file_path index. The suffix
+// makes the key unique while preserving the base36-timestamp scheme.
 func generateDocumentID() string {
 	return base36Encode(time.Now().Unix()) + randomBase36(4)
 }

@@ -25,11 +25,11 @@ import (
 // required dependency (e.g. the storage backend) cannot be constructed, so the
 // caller can fail fast rather than serve a half-initialized app.
 //
-// Route layout preserves the Python contracts:
+// Route layout:
 //   - GET  /health, GET /ready         (health probes)
 //   - GET  /                           (welcome message)
 //   - {API_V1_STR}/auth/*              (auth endpoints; default /api/auth/*)
-//   - {API_V1_STR}/upload, /documents/* (Phase 1 documents)
+//   - {API_V1_STR}/upload, /documents/* (documents)
 func NewRouter(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) (http.Handler, error) {
 	queries := repository.New(pool)
 	tokens := auth.NewTokenService(cfg.SecretKey, durationMinutes(cfg.AccessTokenExpireMinutes))
@@ -50,8 +50,8 @@ func NewRouter(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) (http.H
 	extractionsRoot := filepath.Join(cfg.LocalStoragePath, "extractions")
 	docHandler := handlers.NewDocumentHandler(queries, docSvc, extractionsRoot)
 
-	// Chat / RAG (Phase 4). LLM answers via Gemini when GEMINI_KEYS is set,
-	// else a template response.
+	// Chat / RAG. LLM answers via Gemini when GEMINI_KEYS is set, else a
+	// template response.
 	ragSvc := rag.NewDefaultService(queries, cfg.ChatModel)
 	chatHandler := handlers.NewChatHandler(queries, ragSvc)
 
@@ -63,7 +63,7 @@ func NewRouter(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) (http.H
 	r.Use(appmw.Recoverer(log))
 	r.Use(appmw.CORS(cfg.CORSOrigins))
 
-	// Root + health (unprefixed, matching Python).
+	// Root + health (unprefixed).
 	r.Get("/", func(w http.ResponseWriter, _ *http.Request) {
 		writeWelcome(w)
 	})
@@ -88,7 +88,7 @@ func NewRouter(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) (http.H
 		})
 	})
 
-	// Documents + upload (all require auth). Paths preserved from Python:
+	// Documents + upload (all require auth). Paths:
 	//   POST   {prefix}/upload
 	//   GET    {prefix}/documents
 	//   GET    {prefix}/documents/favorites
@@ -96,7 +96,7 @@ func NewRouter(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) (http.H
 	//   DELETE {prefix}/documents/{id}
 	//   GET    {prefix}/documents/{id}/download
 	//   POST   {prefix}/documents/{id}/favorite
-	//   GET    {prefix}/documents/{id}/extraction | /content | /table-markdown (stubs)
+	//   GET    {prefix}/documents/{id}/extraction | /content | /table-markdown
 	r.Group(func(pr chi.Router) {
 		pr.Use(requireAuth)
 
@@ -116,9 +116,8 @@ func NewRouter(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) (http.H
 			dr.Get("/{id}/table-markdown", docHandler.GetTableMarkdown)
 		})
 
-		// Chat / RAG (Phase 4). Mounted at {prefix}/chat — NOT /api/api/chat
-		// (Python's double-prefix bug is fixed here). POST is registered at the
-		// exact path (no trailing slash) to match the frontend contract.
+		// Chat / RAG. POST is registered at the exact path (no trailing slash) to
+		// match the frontend contract.
 		//   POST   {prefix}/chat
 		//   GET    {prefix}/chat/sessions
 		//   DELETE {prefix}/chat/sessions/{conversationId}

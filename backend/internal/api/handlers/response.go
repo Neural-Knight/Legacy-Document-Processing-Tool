@@ -23,12 +23,12 @@ func copyStream(w io.Writer, src io.Reader) (int64, error) {
 	return io.Copy(w, src)
 }
 
-// errorResponse mirrors FastAPI's error body shape: {"detail": "..."}.
+// errorResponse is the JSON error body shape: {"detail": "..."}.
 type errorResponse struct {
 	Detail string `json:"detail"`
 }
 
-// writeError emits a FastAPI-compatible error body.
+// writeError emits a JSON error body ({"detail": "..."}).
 func writeError(w http.ResponseWriter, status int, detail string) {
 	writeJSON(w, status, errorResponse{Detail: detail})
 }

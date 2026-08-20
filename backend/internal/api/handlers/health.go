@@ -19,7 +19,7 @@ func NewHealthHandler(pool *pgxpool.Pool) *HealthHandler {
 }
 
 // Health is a liveness probe: the process is up (GET /health).
-// Body matches the Python backend: {"status": "healthy"}.
+// Body is {"status": "healthy"}.
 func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "healthy"})
 }

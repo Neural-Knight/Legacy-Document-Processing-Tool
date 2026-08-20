@@ -1,7 +1,5 @@
--- Phase 3: formalize the tables_metadata table that the Python md2sql pipeline
--- created at runtime. We create it via migration instead (no runtime DDL for
--- this bookkeeping table). Columns mirror the Python
--- pdf_extractor._direct_execute_sql_file definition.
+-- tables_metadata: bookkeeping for tables extracted from documents by the
+-- md2sql step. Created here via migration rather than at runtime.
 --
 -- Note: the dynamic per-table extraction tables ({timestamp}_p{N}_...) are
 -- still created at runtime by the worker's md2sql step — those are data tables

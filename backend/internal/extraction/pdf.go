@@ -11,14 +11,13 @@ import (
 	"time"
 )
 
-// pdfDPI is the render resolution for Gemini/OCR page images (matches Python
-// PdfProcessor's 150 dpi).
+// pdfDPI is the render resolution for Gemini/OCR page images (150 dpi).
 const pdfDPI = 150
 
 // PDFExtractor implements Extractor for PDFs. It detects the PDF type, extracts
 // per-page text (OCR fallback for low-text pages when OCR is available), and
 // optionally renders pages for Gemini table markdown. Artifacts are written
-// under extractionsRoot/doc_{id}/{ts}_{basename}/ to match the Python layout.
+// under extractionsRoot/doc_{id}/{ts}_{basename}/.
 type PDFExtractor struct {
 	deps            Deps
 	extractionsRoot string // {LOCAL_STORAGE_PATH}/extractions
@@ -58,7 +57,7 @@ func (e *PDFExtractor) Extract(ctx context.Context, filePath string, documentID 
 		author = "Unknown"
 	}
 
-	// Prepare the output directory (Python layout).
+	// Prepare the output directory.
 	base := strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
 	ts := time.Now().Format("20060102_150405")
 	outputDir := filepath.Join(e.extractionsRoot, fmt.Sprintf("doc_%d", documentID), fmt.Sprintf("%s_%s", ts, base))
@@ -124,12 +123,12 @@ func (e *PDFExtractor) Extract(ctx context.Context, filePath string, documentID 
 		Pages:        pages,
 	}
 
-	// Write extraction.json (parity with Python save_extraction_results).
+	// Write extraction.json.
 	if data, merr := json.MarshalIndent(content, "", "  "); merr == nil {
 		_ = os.WriteFile(filepath.Join(outputDir, "extraction.json"), data, 0o644)
 	}
 
-	// Clean up rendered page images (Python deletes page_images after saving).
+	// Clean up rendered page images after saving.
 	_ = os.RemoveAll(imagesDir)
 
 	return content, outputDir, nil
@@ -187,7 +186,7 @@ func (e *PDFExtractor) extractTables(ctx context.Context, log *slog.Logger, file
 	}
 }
 
-// detectType maps page counts to a PDFType (Python _detect_pdf_type).
+// detectType maps page counts to a PDFType.
 func detectType(total, scanned, readable int) PDFType {
 	switch {
 	case total == 0:

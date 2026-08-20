@@ -1,8 +1,8 @@
 // Package gemini is a small text-generation client for the Gemini
 // generateContent REST API, with GEMINI_KEYS space-separated key rotation.
-// It is used by the RAG chat service to generate answers. (The Phase 3
-// extraction package has its own image-oriented Gemini client; this one is
-// text-only and kept separate to avoid coupling chat to extraction.)
+// It is used by the RAG chat service to generate answers. (The extraction
+// package has its own image-oriented Gemini client; this one is text-only and
+// kept separate to avoid coupling chat to extraction.)
 package gemini
 
 import (

@@ -12,8 +12,7 @@ import (
 
 // PopplerEngine is a PDFTextEngine backed by the poppler CLI tools
 // (pdftotext, pdfinfo, pdftoppm). It requires no CGO and is portable across
-// platforms where poppler is installed. This replaces the Python PyMuPDF/fitz
-// usage for the text path; see MIGRATION.md for the rationale.
+// platforms where poppler is installed.
 type PopplerEngine struct{}
 
 // NewPopplerEngine returns a poppler-backed engine.

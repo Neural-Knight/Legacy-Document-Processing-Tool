@@ -9,8 +9,7 @@ import (
 )
 
 // LocalStorage stores objects on the local filesystem under rootPath. The
-// object key is a path relative to rootPath (matching the Python
-// LocalStorageService, which stored just the filename as the relative path).
+// object key is a path relative to rootPath.
 type LocalStorage struct {
 	rootPath string
 }

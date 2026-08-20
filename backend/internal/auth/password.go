@@ -11,25 +11,22 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-// The Python backend hashes passwords with passlib's argon2 handler
-// (CryptContext(schemes=["argon2"])), which produces argon2id hashes in the
-// standard PHC string format:
+// Passwords are hashed with argon2id in the standard PHC string format:
 //
 //	$argon2id$v=19$m=<mem>,t=<time>,p=<par>$<b64salt>$<b64hash>
 //
-// We emit the same format and verify hashes by parsing their embedded
-// parameters, so hashes created by the Python service remain verifiable here
-// and vice versa. Defaults below match passlib's argon2 defaults.
+// Verification parses the parameters embedded in each hash, so hashes produced
+// with different cost settings still verify.
 const (
-	argonTimeCost   = 3     // passlib default rounds
-	argonMemoryCost = 65536 // 64 MiB (passlib default memory_cost, in KiB)
-	argonThreads    = 4     // passlib default parallelism
-	argonSaltLen    = 16    // passlib default salt size (bytes)
-	argonKeyLen     = 32    // passlib default hash length (bytes)
+	argonTimeCost   = 3     // rounds
+	argonMemoryCost = 65536 // 64 MiB (memory_cost, in KiB)
+	argonThreads    = 4     // parallelism
+	argonSaltLen    = 16    // salt size (bytes)
+	argonKeyLen     = 32    // hash length (bytes)
 	argonVersion    = argon2.Version
 )
 
-// HashPassword returns a passlib-compatible argon2id PHC hash string.
+// HashPassword returns an argon2id PHC hash string.
 func HashPassword(password string) (string, error) {
 	salt := make([]byte, argonSaltLen)
 	if _, err := rand.Read(salt); err != nil {
@@ -37,7 +34,7 @@ func HashPassword(password string) (string, error) {
 	}
 	hash := argon2.IDKey([]byte(password), salt, argonTimeCost, argonMemoryCost, argonThreads, argonKeyLen)
 
-	// passlib omits base64 padding, matching the reference argon2 CLI format.
+	// Base64 fields are unpadded, matching the reference argon2 CLI format.
 	b64 := base64.RawStdEncoding
 	return fmt.Sprintf(
 		"$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
@@ -48,7 +45,7 @@ func HashPassword(password string) (string, error) {
 
 // VerifyPassword checks a plaintext password against an encoded argon2id hash.
 // It reads the cost parameters from the encoded string so hashes produced with
-// different settings (e.g. by an older Python deployment) still verify.
+// different settings still verify.
 func VerifyPassword(password, encoded string) bool {
 	params, salt, want, err := decodeArgon2(encoded)
 	if err != nil {

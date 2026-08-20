@@ -1,8 +1,7 @@
 // Package documents holds the document domain service: filename/ID generation,
 // extension validation, upload-size enforcement, and the upload/delete flows.
-// It ports the relevant behavior of the Python document_processor and
-// storage_service. Upload enqueues an extraction job (Phase 2); the actual
-// extraction runs asynchronously in the worker (Phase 3).
+// Upload enqueues an extraction job; the actual extraction runs asynchronously
+// in the worker.
 package documents
 
 import (
@@ -20,13 +19,12 @@ import (
 	"github.com/legacy-document-processing-tool/backend/internal/storage"
 )
 
-// SupportedExtensions is the upload whitelist, matching
-// DocumentProcessor.SUPPORTED_EXTENSIONS in the Python backend.
+// SupportedExtensions is the upload whitelist.
 var SupportedExtensions = []string{"pdf", "xlsx", "xls", "csv", "json", "xml"}
 
 // Sentinel errors mapped to HTTP status codes by the handler layer.
 var (
-	// ErrUnsupportedType → 400 (Python: "Unsupported file type").
+	// ErrUnsupportedType → 400.
 	ErrUnsupportedType = errors.New("Unsupported file type")
 	// ErrTooLarge → 413; upload exceeded MAX_UPLOAD_SIZE.
 	ErrTooLarge = errors.New("File exceeds maximum upload size")
@@ -46,7 +44,7 @@ func NewService(queries *repository.Queries, store storage.ObjectStorage, maxUpl
 }
 
 // IsValidExtension reports whether filename has a supported extension
-// (case-insensitive), matching the Python _is_valid_file_type check.
+// (case-insensitive).
 func IsValidExtension(filename string) bool {
 	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(filename)), ".")
 	for _, e := range SupportedExtensions {
@@ -99,7 +97,7 @@ func (s *Service) Upload(ctx context.Context, userID int32, originalFilename, co
 		return repository.Document{}, ErrTooLarge
 	}
 
-	fileSize := strconv.FormatInt(meta.FileSize, 10) // stored as string, matches Python
+	fileSize := strconv.FormatInt(meta.FileSize, 10) // stored as a string
 	status := "uploaded"
 	processed := false
 	filename := meta.Filename
@@ -181,7 +179,7 @@ var knownContentTypes = map[string]string{
 
 // guessContentType returns a MIME type for the filename: first our pinned map
 // for supported types, then the OS mime table, defaulting to
-// application/octet-stream (mirrors the Python mimetypes fallback).
+// application/octet-stream.
 func guessContentType(filename string) string {
 	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(filename)), ".")
 	if ct, ok := knownContentTypes[ext]; ok {

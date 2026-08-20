@@ -15,14 +15,14 @@ import (
 	"github.com/legacy-document-processing-tool/backend/internal/repository"
 )
 
-// RealProcessor implements the Phase 3 pipeline. For PDFs it runs the extraction
-// package (text + optional OCR + optional Gemini tables), writes artifacts, runs
-// md2sql on any tables/*.md, and stores the flat structured JSON. Non-PDF types
-// keep the Python placeholder wrapper. Status transitions match StubProcessor:
+// RealProcessor implements the extraction pipeline. For PDFs it runs the
+// extraction package (text + optional OCR + optional Gemini tables), writes
+// artifacts, runs md2sql on any tables/*.md, and stores the flat structured
+// JSON. Non-PDF types use the placeholder wrapper. Status transitions are
 // uploaded → processing → processed (or error on failure).
 //
-// It satisfies worker.Processor, so cmd/worker can swap it in without touching
-// the Runner.
+// It satisfies worker.Processor, so it can be swapped in without touching the
+// Runner.
 type RealProcessor struct {
 	queries   *repository.Queries
 	pool      *pgxpool.Pool
@@ -72,7 +72,7 @@ func (p *RealProcessor) Process(ctx context.Context, job repository.ProcessingJo
 		content = b
 
 		// Load any extracted tables into dynamic SQL tables (md2sql). Best-effort:
-		// table load failures are logged but don't fail the job, matching Python.
+		// table load failures are logged but don't fail the job.
 		if outputDir != "" {
 			tablesDir := filepath.Join(outputDir, "tables")
 			prefix := base36Timestamp()
@@ -83,7 +83,7 @@ func (p *RealProcessor) Process(ctx context.Context, job repository.ProcessingJo
 			}
 		}
 	} else {
-		// Non-PDF: keep the Python placeholder wrapper.
+		// Non-PDF: use the placeholder wrapper.
 		content = extraction.PlaceholderContent(originalName, relPath)
 	}
 

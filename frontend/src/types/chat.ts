@@ -17,6 +17,10 @@ export interface ChatSession {
   lastUpdated: Date;
   messages: ChatMessage[];
   previewText?: string; // First few characters of last message
+  // Conversation id returned by the backend chat API. The local `id` is used
+  // for tab/session management in IndexedDB; this links the tab to its
+  // server-side conversation so follow-up messages resume it.
+  backendConversationId?: string;
 }
 
 // Type for chat-related actions

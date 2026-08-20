@@ -24,7 +24,7 @@ type S3Storage struct {
 }
 
 // NewS3Storage builds an S3-backed store from config (bucket, region,
-// credentials), mirroring the Python S3StorageService.
+// credentials).
 func NewS3Storage(cfg *appconfig.Config) (*S3Storage, error) {
 	if cfg.S3BucketName == "" {
 		return nil, fmt.Errorf("S3_BUCKET_NAME is required when STORAGE_TYPE=s3")

@@ -13,10 +13,10 @@ import (
 	"time"
 )
 
-// geminiModel matches the Python PdfProcessor model.
+// geminiModel is the model used for table extraction.
 const geminiModel = "gemini-2.0-flash"
 
-// geminiPrompt mirrors the Python table-extraction prompt: emit "## table_name"
+// geminiPrompt is the table-extraction prompt: emit "## table_name"
 // + SQL-friendly markdown tables, or exactly "NO TABLES FOUND".
 const geminiPrompt = `You are given an image of a document page. If it contains one or more tables, ` +
 	`for each table output a line "## table_name" where table_name is a short (<=50 chars) ` +

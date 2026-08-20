@@ -1,15 +1,11 @@
--- Baseline schema for the Go backend, managed by golang-migrate.
---
--- This consolidates the full Alembic head from the archive/python branch
--- (revisions a4325417313d → 3433b6c11700 → 47abacc1105d → a694cc315a17
---  → 1fa2cc95c28e → 20e0b9db090c) into a single migration applied to an
--- empty database. Table shapes, indexes, and foreign keys match that head;
--- see ../MIGRATION.md for the (minor) DDL differences noted vs Alembic.
+-- Baseline schema for the backend, managed by golang-migrate. Creates the core
+-- tables (users, auth, documents, favorites, extractions, chat, vectors) on an
+-- empty database.
 
 BEGIN;
 
 -- ---------------------------------------------------------------------------
--- users  (Alembic 3433b6c11700)
+-- users
 -- ---------------------------------------------------------------------------
 CREATE TABLE users (
     id              SERIAL PRIMARY KEY,
@@ -28,7 +24,7 @@ CREATE INDEX ix_users_id ON users (id);
 CREATE UNIQUE INDEX ix_users_username ON users (username);
 
 -- ---------------------------------------------------------------------------
--- refresh_tokens  (Alembic 3433b6c11700)
+-- refresh_tokens
 -- ---------------------------------------------------------------------------
 CREATE TABLE refresh_tokens (
     id         SERIAL PRIMARY KEY,
@@ -44,8 +40,8 @@ CREATE INDEX ix_refresh_tokens_id ON refresh_tokens (id);
 CREATE UNIQUE INDEX ix_refresh_tokens_token ON refresh_tokens (token);
 
 -- ---------------------------------------------------------------------------
--- documents  (Alembic 47abacc1105d + 20e0b9db090c)
---   20e0b9db090c added `status` and changed file_size INTEGER -> VARCHAR(100).
+-- documents  (file_size is VARCHAR to hold formatted sizes; status tracks the
+-- processing lifecycle: uploaded → processing → processed/error)
 -- ---------------------------------------------------------------------------
 CREATE TABLE documents (
     id                SERIAL PRIMARY KEY,
@@ -66,7 +62,7 @@ CREATE UNIQUE INDEX ix_documents_file_path ON documents (file_path);
 CREATE INDEX idx_document_filename_processed ON documents (filename, processed);
 
 -- ---------------------------------------------------------------------------
--- user_favorites  (Alembic a694cc315a17)
+-- user_favorites
 -- ---------------------------------------------------------------------------
 CREATE TABLE user_favorites (
     id          SERIAL PRIMARY KEY,
@@ -77,7 +73,7 @@ CREATE TABLE user_favorites (
 CREATE INDEX ix_user_favorites_id ON user_favorites (id);
 
 -- ---------------------------------------------------------------------------
--- chat_sessions  (Alembic 1fa2cc95c28e)
+-- chat_sessions
 -- ---------------------------------------------------------------------------
 CREATE TABLE chat_sessions (
     id           VARCHAR PRIMARY KEY,
@@ -90,7 +86,7 @@ CREATE TABLE chat_sessions (
 );
 
 -- ---------------------------------------------------------------------------
--- chat_messages  (Alembic 1fa2cc95c28e)
+-- chat_messages
 -- ---------------------------------------------------------------------------
 CREATE TABLE chat_messages (
     id               SERIAL PRIMARY KEY,
@@ -103,7 +99,7 @@ CREATE TABLE chat_messages (
 CREATE INDEX ix_chat_messages_id ON chat_messages (id);
 
 -- ---------------------------------------------------------------------------
--- extractions  (Alembic 1fa2cc95c28e)
+-- extractions
 -- ---------------------------------------------------------------------------
 CREATE TABLE extractions (
     id              SERIAL PRIMARY KEY,
@@ -116,7 +112,7 @@ CREATE TABLE extractions (
 CREATE INDEX ix_extractions_id ON extractions (id);
 
 -- ---------------------------------------------------------------------------
--- vector_entries  (Alembic 1fa2cc95c28e)
+-- vector_entries
 -- ---------------------------------------------------------------------------
 CREATE TABLE vector_entries (
     id               SERIAL PRIMARY KEY,

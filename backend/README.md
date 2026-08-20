@@ -114,6 +114,41 @@ Compose brings up Postgres, runs the Go `migrate` binary (which exits 0 on
 success), then starts the API on `:8000` **and** the worker. Both share the
 `uploads_data` volume for local storage.
 
+## Local end-to-end test (frontend + backend)
+
+Full manual smoke test with the React frontend talking to the Go stack:
+
+```bash
+# 1. Backend stack (db + migrate + backend + worker). Set GEMINI_KEYS in .env
+#    for real chat answers + table extraction (optional; works without).
+cd backend
+cp .env.example .env            # edit POSTGRES_*, SECRET_KEY, optionally GEMINI_KEYS
+docker compose --env-file .env down -v
+docker compose --env-file .env up --build -d
+
+# 2. Frontend dev server (proxies /api → :8000).
+cd ../frontend
+cp .env.example .env            # VITE_API_URL=http://localhost:8000/api
+npm install
+npm run dev                     # http://localhost:3000
+```
+
+Then in the browser:
+
+1. Register, then log in.
+2. Upload a PDF. The document list polls `GET /api/documents/{id}` until
+   `processed` is true (or `processing_error` is set).
+3. Open the document viewer — it renders the extracted content
+   (`GET /api/documents/{id}/content`); with `GEMINI_KEYS` set, the tables tab
+   loads `GET /api/documents/{id}/table-markdown`.
+4. Query Agent: select the document and ask a question. The answer comes from
+   `POST /api/chat` (real Gemini answer when `GEMINI_KEYS` is set, otherwise a
+   template response over the retrieved chunks).
+5. Reload the page — chat continues on the same conversation (`conversation_id`).
+
+`GEMINI_KEYS` must be present for **both** the API (chat answer generation) and
+the worker (PDF table extraction); the compose file passes it to both.
+
 ## Architecture: async document processing
 
 Upload no longer processes inline. Instead:
@@ -135,7 +170,7 @@ Upload no longer processes inline. Instead:
 This replaces the Python backend's unsafe `asyncio.create_task(db_session)`,
 which had no persistence, retries, or safe session handling.
 
-## PDF extraction (Phase 3)
+## PDF extraction
 
 For PDFs the worker's `RealProcessor` runs the `internal/extraction` pipeline:
 
@@ -187,7 +222,7 @@ golden JSON. `TestGoldenExtractionShape` compares extraction output against it
 and supports `go test ./internal/extraction/ -run TestGoldenExtractionShape -update`
 to regenerate; see that folder's `README.md` for how the fixtures were produced.
 
-## Indexing + chat (Phase 4)
+## Indexing + chat
 
 After a successful extraction the worker indexes the content for retrieval
 (`internal/indexer`), then chat answers questions over it (`internal/rag`):

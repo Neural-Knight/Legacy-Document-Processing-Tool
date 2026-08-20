@@ -249,8 +249,8 @@ func TestDocumentLifecycle(t *testing.T) {
 	// extraction/content 404s while the doc is unprocessed — if an external
 	// worker (e.g. a Docker worker sharing this DB) has processed it, those
 	// endpoints legitimately return 200, so we skip them to avoid a race.
-	// /table-markdown always 404s until real table extraction exists (Phase 3+
-	// only writes files when Gemini keys are present).
+	// /table-markdown 404s unless table markdown files exist (only written when
+	// Gemini keys are present during extraction).
 	rGet := authGet(t, srv.URL+"/api/documents/"+itoa(int64(doc.ID)), token)
 	var cur docJSON
 	json.NewDecoder(rGet.Body).Decode(&cur)

@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Document } from './documentService';
 import { getAccessToken, isAuthenticated } from './authService';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api';
 
 // Interface definitions
 export interface StorageInfo {

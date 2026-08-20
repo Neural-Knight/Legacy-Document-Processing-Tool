@@ -49,7 +49,7 @@ func run(log *slog.Logger) error {
 
 	queries := repository.New(pool)
 
-	// Build the Phase 3 extraction pipeline. The PDF text engine (poppler) is
+	// Build the extraction pipeline. The PDF text engine (poppler) is
 	// used when the binaries are present; Gemini table extraction and OCR are
 	// optional and degrade gracefully when unconfigured/unavailable.
 	var pdfExtractor extraction.Extractor

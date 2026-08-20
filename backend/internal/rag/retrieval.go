@@ -1,7 +1,6 @@
-// Package rag ports the Python rag_service.py: keyword retrieval over
-// vector_entries plus response generation. Phase 4 uses a real Gemini LLM when
-// GEMINI_KEYS is set, falling back to the Python-style template otherwise.
-// Vector similarity search is deferred to Phase 6 (pgvector).
+// Package rag provides keyword retrieval over vector_entries plus response
+// generation. It uses a Gemini LLM when GEMINI_KEYS is set, falling back to a
+// template answer otherwise. Vector similarity search is not yet implemented.
 package rag
 
 import (
@@ -11,12 +10,11 @@ import (
 	"github.com/legacy-document-processing-tool/backend/internal/repository"
 )
 
-// topN is the number of chunks returned by retrieval (matches Python's 5).
+// topN is the number of chunks returned by retrieval.
 const topN = 5
 
 // scoreChunk counts how many query terms appear in the chunk text (case-
-// insensitive substring match), matching the Python _retrieve_relevant_chunks
-// scoring.
+// insensitive substring match).
 func scoreChunk(chunkText string, queryTerms []string) int {
 	text := strings.ToLower(chunkText)
 	score := 0
@@ -29,8 +27,8 @@ func scoreChunk(chunkText string, queryTerms []string) int {
 }
 
 // retrieveRelevant scores all candidate chunks by keyword overlap and returns
-// the top-N with score > 0, highest first. Ports the Python scoring + sort +
-// top-5 slice. Stable sort keeps insertion order among equal scores.
+// the top-N with score > 0, highest first. Stable sort keeps insertion order
+// among equal scores.
 func retrieveRelevant(query string, chunks []repository.VectorEntry) []repository.VectorEntry {
 	terms := strings.Fields(strings.ToLower(query))
 

@@ -17,9 +17,8 @@ func UserFromContext(ctx context.Context) (repository.User, bool) {
 	return u, ok
 }
 
-// RequireAuth validates the Bearer access token and loads the user, porting
-// get_current_user from app/api/deps.py. On failure it responds 401 and stops
-// the chain.
+// RequireAuth validates the Bearer access token and loads the user. On failure
+// it responds 401 and stops the chain.
 func RequireAuth(tokens *auth.TokenService, queries *repository.Queries) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

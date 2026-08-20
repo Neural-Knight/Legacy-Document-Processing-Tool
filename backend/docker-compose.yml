@@ -15,9 +15,8 @@ services:
       timeout: 5s
       retries: 5
 
-  # Applies the Go (golang-migrate) migrations, then exits. No Python.
-  # Reuses the same image as the backend and overrides the entrypoint to run
-  # the migrate binary.
+  # Applies the database migrations, then exits. Reuses the backend image and
+  # overrides the entrypoint to run the migrate binary.
   migrate:
     build:
       context: .
@@ -41,6 +40,10 @@ services:
         condition: service_completed_successfully
     ports:
       - "8000:8000"
+    # Load local .env as the single source of truth; explicit environment below
+    # overrides where a container-specific value is required (e.g. db host).
+    env_file:
+      - .env
     volumes:
       # Persist locally-stored uploads across container restarts.
       - uploads_data:/app/uploads
@@ -57,6 +60,11 @@ services:
       - MAX_UPLOAD_SIZE=${MAX_UPLOAD_SIZE:-50}
       - STORAGE_TYPE=${STORAGE_TYPE:-local}
       - LOCAL_STORAGE_PATH=/app/uploads
+      # Chat/RAG needs Gemini keys on the API too (answer generation).
+      - GEMINI_KEYS=${GEMINI_KEYS:-}
+      - CHAT_MODEL=${CHAT_MODEL:-gemini-2.0-flash}
+      - CHUNK_SIZE=${CHUNK_SIZE:-1000}
+      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-200}
 
   # Document-processing worker. Shares the same image and the uploads volume as
   # the backend; runs the worker binary instead of the API. Claims jobs from the
@@ -72,6 +80,8 @@ services:
         condition: service_completed_successfully
     entrypoint: ["/usr/local/bin/worker"]
     restart: unless-stopped
+    env_file:
+      - .env
     volumes:
       - uploads_data:/app/uploads
     environment:
@@ -81,10 +91,12 @@ services:
       - MAX_CONCURRENT_JOBS=${MAX_CONCURRENT_JOBS:-2}
       - JOB_POLL_INTERVAL_MS=${JOB_POLL_INTERVAL_MS:-1000}
       - JOB_LOCK_TIMEOUT_MINUTES=${JOB_LOCK_TIMEOUT_MINUTES:-120}
-      # Extraction (Phase 3). GEMINI_KEYS empty → table extraction skipped.
+      # GEMINI_KEYS empty → table extraction skipped; text extraction still runs.
       - GEMINI_KEYS=${GEMINI_KEYS:-}
       - OCR_LANGUAGE=${OCR_LANGUAGE:-eng}
       - MAX_PAGE_WORKERS=${MAX_PAGE_WORKERS:-4}
+      - CHUNK_SIZE=${CHUNK_SIZE:-1000}
+      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-200}
 
 volumes:
   postgres_data:

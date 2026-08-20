@@ -1,18 +1,18 @@
-// Package indexer ports the Python content_indexer.py: it turns a document's
-// extraction JSON into text chunks and writes them to vector_entries for RAG
-// retrieval. Embeddings are deferred (Phase 6); the vector column stays NULL.
+// Package indexer turns a document's extraction JSON into text chunks and
+// writes them to vector_entries for RAG retrieval. Embeddings are not yet
+// implemented; the vector column stays NULL.
 package indexer
 
 import "strings"
 
-// Defaults match the Python ContentIndexer (chunk_size=1000, overlap=200).
+// Defaults are chunk_size=1000, overlap=200.
 const (
 	DefaultChunkSize    = 1000
 	DefaultChunkOverlap = 200
 )
 
 // chunkText splits text into overlapping chunks, breaking at paragraph/sentence
-// boundaries where possible. Ports Python _chunk_text + _find_boundary.
+// boundaries where possible.
 func chunkText(text string, size, overlap int) []string {
 	runes := []rune(text)
 	n := len(runes)
@@ -31,7 +31,7 @@ func chunkText(text string, size, overlap int) []string {
 		boundary := findBoundary(runes, end)
 		chunks = append(chunks, string(runes[start:boundary]))
 		start = boundary - overlap
-		// Ensure forward progress, matching the Python guard.
+		// Ensure forward progress.
 		if start < 0 || start >= n-10 {
 			break
 		}
@@ -40,7 +40,7 @@ func chunkText(text string, size, overlap int) []string {
 }
 
 // findBoundary finds the nearest paragraph, then sentence, then word boundary
-// at/after position, scanning within a small window. Ports _find_boundary.
+// at/after position, scanning within a small window.
 func findBoundary(runes []rune, position int) int {
 	n := len(runes)
 
@@ -67,7 +67,7 @@ func findBoundary(runes []rune, position int) int {
 	return position
 }
 
-// tableToText renders a table as pipe-delimited text, ports _table_to_text.
+// tableToText renders a table as pipe-delimited text.
 func tableToText(headers []string, data [][]string, pageNumber, tableIndex int) string {
 	var parts []string
 	parts = append(parts, sprintfTableHeader(tableIndex, pageNumber))
@@ -81,7 +81,7 @@ func tableToText(headers []string, data [][]string, pageNumber, tableIndex int) 
 }
 
 func sprintfTableHeader(tableIndex, pageNumber int) string {
-	// "Table N on page P:" — matches Python (1-based table number).
+	// "Table N on page P:" — table number is 1-based.
 	return "Table " + itoa(tableIndex+1) + " on page " + itoa(pageNumber) + ":"
 }
 

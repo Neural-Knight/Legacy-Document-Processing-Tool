@@ -9,7 +9,7 @@ interface ApiErrorResponse {
   [key: string]: any; // Allow for any other properties
 }
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api';
 
 // Access token storage key
 const ACCESS_TOKEN_KEY = 'access_token';
