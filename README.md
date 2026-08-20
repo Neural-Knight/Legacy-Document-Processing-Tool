@@ -126,12 +126,3 @@ docker compose down -v        # wipe volumes (fresh database)
 - HTTP rate limiting is not implemented in the Go backend
 
 Full backend documentation: [backend/README.md](backend/README.md)
-
-Migration history: [MIGRATION.md](MIGRATION.md)
-
-## Branches
-
-| Branch | Purpose |
-|--------|---------|
-| `main` | Current application (Go backend + React frontend) |
-| `archive/python` | Frozen Python/FastAPI backend for reference |
