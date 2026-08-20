@@ -17,6 +17,7 @@ import (
 
 	"github.com/legacy-document-processing-tool/backend/internal/config"
 	"github.com/legacy-document-processing-tool/backend/internal/extraction"
+	"github.com/legacy-document-processing-tool/backend/internal/indexer"
 	"github.com/legacy-document-processing-tool/backend/internal/repository"
 	"github.com/legacy-document-processing-tool/backend/internal/worker"
 )
@@ -69,7 +70,8 @@ func run(log *slog.Logger) error {
 		log.Warn("poppler not found; PDFs will use placeholder extraction (install poppler-utils)")
 	}
 
-	processor := worker.NewRealProcessor(queries, pool, pdfExtractor, cfg.LocalStoragePath, log)
+	idx := indexer.New(cfg.ChunkSize, cfg.ChunkOverlap)
+	processor := worker.NewRealProcessor(queries, pool, pdfExtractor, idx, cfg.LocalStoragePath, log)
 
 	runner := worker.NewRunner(queries, processor, log, worker.Options{
 		WorkerID:      cfg.WorkerID,

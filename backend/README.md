@@ -13,10 +13,15 @@ Implemented so far (see `../MIGRATION.md`):
 - **Phase 3**: real PDF extraction in the worker (`internal/extraction`) — per-page
   text via poppler (`pdftotext`), scanned-page detection with optional
   `tesseract` OCR, optional Gemini table markdown, and `md2sql` loading of
-  extracted tables into dynamic SQL tables. `/content` now returns the flat
+  extracted tables into dynamic SQL tables. `/content` returns the flat
   structured PDF JSON the frontend expects; `/table-markdown` serves the
-  per-page markdown. Non-PDF types keep the placeholder wrapper. Indexing / RAG
-  / chat remain deferred (Phase 4).
+  per-page markdown.
+- **Phase 4**: indexing + RAG chat. After extraction the worker chunks content
+  into `vector_entries` (`internal/indexer`). `POST /api/chat` retrieves the most
+  relevant chunks (keyword overlap) and answers via Gemini (`GEMINI_KEYS`), or a
+  template response when no keys are set. Chat sessions/history are persisted and
+  managed via `/api/chat/*`. Real embeddings + pgvector are deferred (Phase 6);
+  the `vector` column stays NULL.
 
 ## Layout
 
@@ -35,6 +40,9 @@ backend/
 │   ├── worker/              # poll/claim runner + real (PDF) / placeholder processor
 │   ├── extraction/          # PDF pipeline: poppler text, OCR, Gemini tables, structured JSON
 │   ├── md2sql/              # markdown tables → dynamic SQL tables (statement-by-statement)
+│   ├── indexer/             # extraction JSON → vector_entries chunks (RAG)
+│   ├── rag/                 # keyword retrieval + LLM/template answer generation
+│   ├── gemini/              # shared Gemini text-generation client (chat)
 │   ├── api/
 │   │   ├── router.go        # chi routes
 │   │   ├── middleware/      # request id, logging, CORS, recovery
@@ -179,6 +187,39 @@ golden JSON. `TestGoldenExtractionShape` compares extraction output against it
 and supports `go test ./internal/extraction/ -run TestGoldenExtractionShape -update`
 to regenerate; see that folder's `README.md` for how the fixtures were produced.
 
+## Indexing + chat (Phase 4)
+
+After a successful extraction the worker indexes the content for retrieval
+(`internal/indexer`), then chat answers questions over it (`internal/rag`):
+
+1. **Indexing** — `IndexDocument` deletes any existing `vector_entries` for the
+   document (idempotent re-index) and inserts fresh chunks: per-page text
+   (`CHUNK_SIZE`/`CHUNK_OVERLAP`, broken at paragraph/sentence boundaries), a
+   title metadata chunk, and one chunk per extracted table. Chunk metadata is
+   stored in the `message_metadata` column (fixing Python's wrong `metadata=`
+   kwarg). The `vector` column stays NULL until Phase 6. Indexing failure is
+   logged and does not fail the job (same best-effort policy as md2sql).
+2. **Retrieval** — `POST /api/chat` scores candidate chunks by keyword overlap
+   (filtered to `document_ids` when provided) and takes the top 5. Real vector
+   similarity is deferred to Phase 6.
+3. **Generation** — with `GEMINI_KEYS` set, the retrieved context + question are
+   sent to Gemini (`CHAT_MODEL`, default `gemini-2.0-flash`) via the shared
+   `internal/gemini` client (key rotation). With no keys, a Python-style template
+   response is returned. Either way the answer, `sources` (document_id as a
+   string to match the frontend), and `conversation_id` come back.
+4. **Sessions** — a `chat_sessions` row is created (or resumed via
+   `conversation_id`), and both user and assistant `chat_messages` are persisted;
+   `/api/chat/sessions` and `/api/chat/{id}/history` read them back.
+
+### Chat env vars
+
+| Var | Purpose | Default |
+|-----|---------|---------|
+| `GEMINI_KEYS` | Reused for chat answers; empty → template response | *(empty)* |
+| `CHAT_MODEL` | Gemini model for chat | `gemini-2.0-flash` |
+| `CHUNK_SIZE` | Indexer chunk size (chars) | `1000` |
+| `CHUNK_OVERLAP` | Indexer chunk overlap (chars) | `200` |
+
 ## Migrations
 
 Schema is managed by **golang-migrate**. Migration SQL lives in `migrations/`
@@ -231,6 +272,17 @@ Documents + upload (Phase 1, all require Bearer auth):
 | GET | `/api/documents/{id}/extraction` | `{status, extraction_date, error, content_available}`; 404 if no extraction row |
 | GET | `/api/documents/{id}/content` | extraction content JSON — flat structured PDF shape (`document_type`, `title`, `author`, `pages[]`) for PDFs, placeholder wrapper for non-PDF; not-completed → 200 `{status, message}`; no row → 404 |
 | GET | `/api/documents/{id}/table-markdown` | requires completed extraction; `?page_number=N` → `{page, content}`, else `{pages: {N: md}}`; not-completed → 200 `{status, message}`; missing files → 404 |
+
+Chat / RAG (Phase 4, all require Bearer auth):
+
+| Method | Path | Notes |
+|--------|------|-------|
+| POST | `/api/chat` | body `{message, document_ids?, conversation_id?}` (`document_ids` accepts string[] or number[]); → `{response, sources, conversation_id}`; 403 if a referenced document isn't owned |
+| GET | `/api/chat/sessions` | user's chat sessions, newest first |
+| GET | `/api/chat/{conversationId}/history` | messages for the session; 404 if not found/owned |
+| DELETE | `/api/chat/sessions/{conversationId}` | 204; CASCADE deletes messages |
+
+Mounted at `/api/chat` (Python's `/api/api/chat` double-prefix bug is fixed).
 
 Access control matches the Python backend: a user may act on their own
 documents; a superuser may act on any.

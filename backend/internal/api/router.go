@@ -16,6 +16,7 @@ import (
 	"github.com/legacy-document-processing-tool/backend/internal/config"
 	"github.com/legacy-document-processing-tool/backend/internal/documents"
 	"github.com/legacy-document-processing-tool/backend/internal/jobs"
+	"github.com/legacy-document-processing-tool/backend/internal/rag"
 	"github.com/legacy-document-processing-tool/backend/internal/repository"
 	"github.com/legacy-document-processing-tool/backend/internal/storage"
 )
@@ -48,6 +49,11 @@ func NewRouter(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) (http.H
 	docSvc := documents.NewService(queries, store, cfg.MaxUploadSizeMB, jobSvc)
 	extractionsRoot := filepath.Join(cfg.LocalStoragePath, "extractions")
 	docHandler := handlers.NewDocumentHandler(queries, docSvc, extractionsRoot)
+
+	// Chat / RAG (Phase 4). LLM answers via Gemini when GEMINI_KEYS is set,
+	// else a template response.
+	ragSvc := rag.NewDefaultService(queries, cfg.ChatModel)
+	chatHandler := handlers.NewChatHandler(queries, ragSvc)
 
 	r := chi.NewRouter()
 
@@ -109,6 +115,18 @@ func NewRouter(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) (http.H
 			dr.Get("/{id}/content", docHandler.GetExtractionContent)
 			dr.Get("/{id}/table-markdown", docHandler.GetTableMarkdown)
 		})
+
+		// Chat / RAG (Phase 4). Mounted at {prefix}/chat — NOT /api/api/chat
+		// (Python's double-prefix bug is fixed here). POST is registered at the
+		// exact path (no trailing slash) to match the frontend contract.
+		//   POST   {prefix}/chat
+		//   GET    {prefix}/chat/sessions
+		//   DELETE {prefix}/chat/sessions/{conversationId}
+		//   GET    {prefix}/chat/{conversationId}/history
+		pr.Post(cfg.APIPrefix+"/chat", chatHandler.Chat)
+		pr.Get(cfg.APIPrefix+"/chat/sessions", chatHandler.ListSessions)
+		pr.Delete(cfg.APIPrefix+"/chat/sessions/{conversationId}", chatHandler.DeleteSession)
+		pr.Get(cfg.APIPrefix+"/chat/{conversationId}/history", chatHandler.History)
 	})
 
 	return r, nil

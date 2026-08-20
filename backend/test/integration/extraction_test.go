@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/legacy-document-processing-tool/backend/internal/extraction"
+	"github.com/legacy-document-processing-tool/backend/internal/indexer"
 	"github.com/legacy-document-processing-tool/backend/internal/repository"
 	"github.com/legacy-document-processing-tool/backend/internal/worker"
 )
@@ -39,7 +40,8 @@ func runRealProcessorOnce(t *testing.T, pool *pgxpool.Pool, localRoot string) bo
 			localRoot+"/extractions", 2,
 		)
 	}
-	proc := worker.NewRealProcessor(q, pool, pdf, localRoot, nil)
+	idx := indexer.New(0, 0) // default chunk size/overlap
+	proc := worker.NewRealProcessor(q, pool, pdf, idx, localRoot, nil)
 	if err := proc.Process(context.Background(), job, doc); err != nil {
 		t.Fatalf("real processor: %v", err)
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/legacy-document-processing-tool/backend/internal/extraction"
+	"github.com/legacy-document-processing-tool/backend/internal/indexer"
 	"github.com/legacy-document-processing-tool/backend/internal/md2sql"
 	"github.com/legacy-document-processing-tool/backend/internal/repository"
 )
@@ -26,17 +27,19 @@ type RealProcessor struct {
 	queries   *repository.Queries
 	pool      *pgxpool.Pool
 	pdf       extraction.Extractor
+	indexer   *indexer.Indexer
 	localRoot string // LOCAL_STORAGE_PATH; used to resolve the absolute file path
 	log       *slog.Logger
 }
 
 // NewRealProcessor builds the real processor. pdf may be nil (then all types use
-// the placeholder path — useful when poppler is unavailable).
-func NewRealProcessor(queries *repository.Queries, pool *pgxpool.Pool, pdf extraction.Extractor, localRoot string, log *slog.Logger) *RealProcessor {
+// the placeholder path — useful when poppler is unavailable). idx may be nil to
+// disable indexing.
+func NewRealProcessor(queries *repository.Queries, pool *pgxpool.Pool, pdf extraction.Extractor, idx *indexer.Indexer, localRoot string, log *slog.Logger) *RealProcessor {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &RealProcessor{queries: queries, pool: pool, pdf: pdf, localRoot: localRoot, log: log}
+	return &RealProcessor{queries: queries, pool: pool, pdf: pdf, indexer: idx, localRoot: localRoot, log: log}
 }
 
 // Process runs extraction for one document.
@@ -96,6 +99,15 @@ func (p *RealProcessor) Process(ctx context.Context, job repository.ProcessingJo
 		Error:      nil,
 	}); err != nil {
 		return fmt.Errorf("write extraction: %w", err)
+	}
+
+	// Index the extracted content for RAG (best-effort: an indexing failure is
+	// logged but does not fail the job, matching the md2sql resilience policy).
+	if p.indexer != nil {
+		if err := p.indexer.IndexDocument(ctx, p.queries, doc, content); err != nil {
+			p.log.Warn("indexing failed (continuing)",
+				slog.Int("document_id", int(doc.ID)), slog.Any("error", err))
+		}
 	}
 
 	if err := p.setStatus(ctx, doc.ID, "processed", true, nil); err != nil {
