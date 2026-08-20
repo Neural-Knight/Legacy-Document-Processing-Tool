@@ -1,340 +1,137 @@
-# Production Deployment Guide
+# Legacy Document Processing Tool
 
-This guide outlines the steps to deploy your Legacy Document Manager to a production environment with secure authentication.
+A document management application with PDF upload, asynchronous extraction, structured content viewing, and a Query Agent that answers questions over your uploaded documents.
 
-## Prerequisites
+The backend was rewritten from Python/FastAPI to Go while keeping the existing React frontend and `/api` contracts. The previous Python implementation is preserved on the `archive/python` branch for reference.
 
-- Domain name with valid SSL certificate
-- Production server (AWS EC2, DigitalOcean Droplet, etc.)
-- PostgreSQL database server
-- AWS S3 bucket for file storage
-- Docker and Docker Compose (recommended)
+## What it does
 
-## Security Checklist
+- **Auth** — register, login, JWT access tokens, refresh-token rotation stored in Postgres
+- **Documents** — upload, list, download, favorites, per-user access control
+- **Processing** — uploads enqueue a background job; a worker extracts PDF text (poppler), optionally OCRs scanned pages (tesseract), optionally extracts tables (Gemini), and indexes content for search
+- **Viewer** — frontend renders extracted JSON and table markdown from the API
+- **Query Agent** — `POST /api/chat` retrieves relevant text chunks and generates an answer via Gemini (or a deterministic fallback when Gemini is unavailable)
 
-Before deploying to production, ensure the following security measures are in place:
+## Repository layout
 
-- [x] JWT-based authentication with refresh tokens
-- [x] Secure password hashing with bcrypt
-- [x] HTTPS enforcement
-- [x] CORS configuration
-- [x] Rate limiting
-- [x] Security headers
-- [x] Proper error handling
-- [x] Secure environment variable management
-- [x] Database connection pooling
-- [x] Token revocation on logout
+```
+Legacy_Document_Processing_Tool/
+├── backend/          Go API + worker + migrations (see backend/README.md)
+├── frontend/         React + Vite + MUI SPA
+├── MIGRATION.md      Python→Go migration tracker (historical execution log)
+└── README.md         this file
+```
 
-## Frontend Deployment
+## Architecture (high level)
 
-### 1. Build the React Application
+```
+Browser (React, :3000)
+        │  HTTP  /api/*
+        ▼
+┌───────────────────────────────────────┐
+│  Go API  (cmd/api, :8000)             │
+│  auth · documents · chat              │
+└───────────────┬───────────────────────┘
+                │
+        ┌───────┴────────┐
+        ▼                ▼
+   PostgreSQL      Object storage
+   (schema +       (local disk or S3)
+    job queue +
+    chat + chunks)
+                ▲
+                │  claims jobs
+        ┌───────┴───────────────────────┐
+        │  Go worker  (cmd/worker)        │
+        │  PDF extract · md2sql · index   │
+        └───────────────────────────────┘
+                │
+                ▼
+           Gemini API  (optional: tables + chat answers)
+```
+
+**Why API and worker are separate processes**
+
+Upload returns immediately. Extraction can take seconds to minutes depending on page count, OCR, and Gemini calls. The worker polls a Postgres-backed job queue (`processing_jobs`) using `FOR UPDATE SKIP LOCKED`, so you can run multiple workers without double-processing the same job.
+
+**Why keyword retrieval instead of vector search (for now)**
+
+Chunks are stored in `vector_entries`, but the `vector` column is unused. Chat retrieval scores chunks by keyword overlap. This keeps the system working without pgvector setup. Semantic embeddings are planned as a follow-up.
+
+## Quick start (local)
+
+### Prerequisites
+
+- Docker (recommended) or Postgres 14+ locally
+- Node.js 18+ for the frontend
+- Gemini API keys (optional; needed for table extraction and LLM chat answers)
+
+### 1. Backend
 
 ```bash
-# Install dependencies
+cd backend
+cp .env.example .env
+# Edit .env: POSTGRES_*, SECRET_KEY, GEMINI_KEYS, GEMINI_MODEL, CHAT_MODEL
+
+# Avoid shell exports overriding .env in Docker Compose
+unset CHAT_MODEL GEMINI_MODEL
+
+docker compose --env-file .env up --build -d
+curl http://localhost:8000/health   # → {"status":"healthy"}
+```
+
+See [backend/README.md](backend/README.md) for native (non-Docker) setup, env reference, and API details.
+
+**Gemini models:** Google periodically retires model names. If you see `404 NOT_FOUND` from Gemini, list available models for your key and set `GEMINI_MODEL` and `CHAT_MODEL` in `.env` (currently `gemini-3.6-flash` for new AI Studio accounts).
+
+### 2. Frontend
+
+```bash
+cd frontend
+cp .env.example .env.local    # optional; defaults to http://localhost:8000/api
 npm install
-
-# Build for production
-npm run build
-
-# Output will be in the 'dist' folder
+npm run dev                   # http://localhost:3000
 ```
 
-### 2. Configure Environment Variables
+Vite proxies `/api` to `http://localhost:8000` during development.
 
-Create a `.env.production` file in your frontend project:
+### 3. Smoke test in the browser
 
-```
-VITE_API_URL=https://api.yourdomain.com/api
-```
+1. Register and log in
+2. Upload a PDF — wait until status is **processed**
+3. Open the document viewer (content + tables tabs)
+4. Query Agent — select the document and ask a question
 
-### 3. Deploy to Web Server
+If chat returns `"Here's what I found in the documents:"` verbatim, Gemini is not being used (missing keys, wrong model, or API error). Check `docker compose logs backend worker`.
 
-You can deploy the static files to:
-
-- AWS S3 + CloudFront
-- Netlify
-- Vercel
-- Nginx/Apache web server
-
-Example Nginx configuration:
-
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com www.yourdomain.com;
-    
-    # Redirect HTTP to HTTPS
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name yourdomain.com www.yourdomain.com;
-    
-    # SSL Configuration
-    ssl_certificate /path/to/fullchain.pem;
-    ssl_certificate_key /path/to/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_prefer_server_ciphers on;
-    ssl_ciphers 'ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384';
-    
-    # Security headers
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Frame-Options "DENY" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Content-Security-Policy "default-src 'self'; connect-src 'self' https://api.yourdomain.com; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline';" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    
-    # Static file serving
-    root /var/www/html/document-manager;
-    index index.html;
-    
-    # Handle SPA routing
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-    
-    # Cache static assets
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
-        expires 30d;
-        add_header Cache-Control "public, no-transform";
-    }
-}
-```
-
-## Backend Deployment
-
-### 1. Prepare for Deployment
-
-Create a `Dockerfile` in your backend directory:
-
-```dockerfile
-FROM python:3.10-slim
-
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY . .
-
-# Create necessary directories
-RUN mkdir -p /app/logs /app/uploads
-
-# Set environment variables
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
-
-# Run application with Uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-Create a `docker-compose.yml` file:
-
-```yaml
-version: '3.8'
-
-services:
-  api:
-    build: 
-      context: ./backend
-      dockerfile: Dockerfile
-    restart: always
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    volumes:
-      - ./logs:/app/logs
-      - ./uploads:/app/uploads
-    depends_on:
-      - db
-    networks:
-      - app-network
-
-  db:
-    image: postgres:14
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    env_file:
-      - .env
-    ports:
-      - "5432:5432"
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
-
-volumes:
-  postgres_data:
-```
-
-### 2. Database Setup
-
-Create a secure PostgreSQL database for production:
-
-```sql
-CREATE DATABASE docmanager;
-CREATE USER docmanager_user WITH PASSWORD 'secure_password';
-GRANT ALL PRIVILEGES ON DATABASE docmanager TO docmanager_user;
-```
-
-### 3. Environment Variables
-
-Ensure all environment variables in the `.env` file are properly set for production.
-
-Important security considerations:
-- Generate a strong random `SECRET_KEY`
-- Use secure passwords for database
-- Use private S3 buckets with proper access policies
-- Set `SESSION_COOKIE_SECURE=true` for HTTPS
-
-### 4. Deploy with Docker
+### Stop the stack
 
 ```bash
-# Build and start the services
-docker-compose up -d
-
-# Run database migrations
-docker-compose exec api alembic upgrade head
-
-# Create initial superuser (if needed)
-docker-compose exec api python -m app.create_superuser
+cd backend
+docker compose down           # keep DB + uploads
+docker compose down -v        # wipe volumes (fresh database)
 ```
 
-### 5. Set Up Reverse Proxy
+## Frontend notes
 
-Example Nginx configuration for the API:
+- **Dev:** `npm run dev` — use this for local work
+- **Production build:** `npm run build` currently fails on pre-existing TypeScript strictness issues; fix those before shipping a production bundle
+- Chat session tabs are cached in IndexedDB for UI state; answers come from the backend
 
-```nginx
-server {
-    listen 80;
-    server_name api.yourdomain.com;
-    
-    # Redirect HTTP to HTTPS
-    return 301 https://$host$request_uri;
-}
+## Backend notes
 
-server {
-    listen 443 ssl http2;
-    server_name api.yourdomain.com;
-    
-    # SSL Configuration
-    ssl_certificate /path/to/fullchain.pem;
-    ssl_certificate_key /path/to/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_prefer_server_ciphers on;
-    ssl_ciphers 'ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384';
-    
-    # Security headers
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Frame-Options "DENY" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    
-    # Proxy settings
-    location / {
-        proxy_pass http://localhost:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-    
-    # Configure timeouts for file uploads
-    client_max_body_size 50M;
-    proxy_connect_timeout 300s;
-    proxy_send_timeout 300s;
-    proxy_read_timeout 300s;
-}
-```
+- Password hashes use **argon2id** in passlib-compatible PHC format, so users created by the old Python service can still log in
+- Migrations are **golang-migrate** SQL embedded in the migrate binary — no Alembic, no Python runtime
+- S3 storage is supported for uploads, but PDF extraction reads from local paths today; S3 + extraction together needs additional work
+- HTTP rate limiting is not implemented in the Go backend
 
-## Monitoring and Maintenance
+Full backend documentation: [backend/README.md](backend/README.md)
 
-### 1. Set Up Logging
+Migration history: [MIGRATION.md](MIGRATION.md)
 
-Configure logging to a central location (e.g., CloudWatch, Loki, ELK stack).
+## Branches
 
-### 2. Set Up Monitoring
-
-Monitor your application with:
-- Prometheus + Grafana
-- AWS CloudWatch
-- Datadog
-- New Relic
-
-### 3. Regular Backups
-
-Set up regular database backups:
-
-```bash
-# Example PostgreSQL backup script
-pg_dump -U docmanager_user -d docmanager -F c -b -v -f /backup/docmanager_$(date +%Y%m%d).backup
-```
-
-### 4. Security Updates
-
-Regularly update dependencies and security patches:
-
-```bash
-# Update dependencies
-pip install --upgrade -r requirements.txt
-
-# Update security patches on the server
-sudo apt update && sudo apt upgrade -y
-```
-
-## Troubleshooting Common Issues
-
-### Authentication Issues
-
-If users experience authentication problems:
-
-1. Check token expiration settings
-2. Verify CORS configuration
-3. Check if HTTPS is properly configured
-4. Verify that localStorage is working in the client's browser
-
-### File Upload Issues
-
-If file uploads are failing:
-
-1. Check S3 bucket permissions
-2. Verify AWS credentials
-3. Check upload size limits
-4. Check Nginx/proxy timeouts
-
-### Database Connection Issues
-
-If database connections are failing:
-
-1. Check connection string
-2. Verify database credentials
-3. Check network connectivity
-4. Verify PostgreSQL is running
-
-## Scaling Considerations
-
-For high-traffic applications:
-
-1. Implement database connection pooling
-2. Consider using a load balancer
-3. Implement caching (Redis)
-4. Use a CDN for static assets
-5. Implement horizontal scaling of the API
-
-## Conclusion
-
-Following this guide will help ensure your Document Management System is deployed securely with a robust authentication system. Regular maintenance and monitoring are essential to keep the system secure and performant.
+| Branch | Purpose |
+|--------|---------|
+| `main` | Current application (Go backend + React frontend) |
+| `archive/python` | Frozen Python/FastAPI backend for reference |
