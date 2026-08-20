@@ -54,7 +54,10 @@ func run(log *slog.Logger) error {
 	}
 	defer pool.Close()
 
-	router := api.NewRouter(cfg, pool, log)
+	router, err := api.NewRouter(cfg, pool, log)
+	if err != nil {
+		return err
+	}
 
 	srv := &http.Server{
 		Addr:              cfg.Host + ":" + cfg.Port,

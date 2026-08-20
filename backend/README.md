@@ -6,8 +6,12 @@ using chi, pgx/v5 + pgxpool, sqlc, log/slog, golang-jwt, and argon2.
 Implemented so far (see `../MIGRATION.md`):
 - **Phase 0/0b**: foundation, health probes, full auth parity, pure-Go migrations.
 - **Phase 1**: document CRUD, favorites, streaming upload/download, local + S3
-  storage. Extraction/RAG/worker are still deferred (Phases 2–4); the
-  extraction endpoints return 404 stubs for now.
+  storage.
+- **Phase 2**: PostgreSQL-backed job queue + a dedicated worker process. Upload
+  enqueues an extraction job; the worker claims it (`FOR UPDATE SKIP LOCKED`)
+  and runs a **stub** processor that sets the document to `processed` and writes
+  a placeholder extraction. Real PDF/table extraction is still deferred (Phase
+  3); `/content` returns the placeholder, `/table-markdown` is still a 404 stub.
 
 ## Layout
 
@@ -15,19 +19,22 @@ Implemented so far (see `../MIGRATION.md`):
 backend/
 ├── cmd/
 │   ├── api/                 # HTTP server entrypoint
-│   └── migrate/             # migration runner (golang-migrate)
+│   ├── migrate/             # migration runner (golang-migrate)
+│   └── worker/              # document-processing worker entrypoint
 ├── internal/
 │   ├── config/              # env-based configuration
 │   ├── auth/                # argon2 hashing, JWT, refresh-token service
 │   ├── storage/             # ObjectStorage interface + local & S3 backends
-│   ├── documents/           # document domain service (id gen, validation, upload/delete)
+│   ├── documents/           # document domain service (id gen, validation, upload/delete/enqueue)
+│   ├── jobs/                # job-queue façade (enqueue/cancel) + backoff schedule
+│   ├── worker/              # poll/claim runner + stub processor
 │   ├── api/
 │   │   ├── router.go        # chi routes
 │   │   ├── middleware/      # request id, logging, CORS, recovery
 │   │   └── handlers/        # auth, health, document handlers, auth middleware
 │   └── repository/          # sqlc-generated queries + Migrate() helper
 ├── migrations/              # golang-migrate SQL (embedded); schema source of truth
-├── test/integration/        # end-to-end auth + document tests (build tag: integration)
+├── test/integration/        # end-to-end auth + document + job/worker tests (build tag: integration)
 ├── Dockerfile               # Go multi-stage build (api + migrate binaries)
 ├── docker-compose.yml       # db + migrate (Go) + backend
 └── sqlc.yaml
@@ -51,6 +58,10 @@ Copy `.env.example` to `.env` and adjust. Key vars:
 | `REFRESH_TOKEN_EXPIRE_DAYS` | Refresh-token lifetime (with remember-me) | `7` |
 | `BACKEND_CORS_ORIGINS` | Allowed origins (comma-separated or JSON array) | `http://localhost:3000,http://127.0.0.1:3000` |
 | `HOST` / `PORT` | Bind address | `0.0.0.0` / `8000` |
+| `MAX_CONCURRENT_JOBS` | Worker: max jobs processed at once | `2` |
+| `JOB_POLL_INTERVAL_MS` | Worker: queue poll interval | `1000` |
+| `JOB_LOCK_TIMEOUT_MINUTES` | Worker: reclaim jobs locked longer than this | `30` |
+| `WORKER_ID` | Worker: identifier stamped on claimed jobs | hostname |
 
 ## Run locally
 
@@ -62,6 +73,9 @@ DATABASE_URL=postgresql://user:pass@localhost:5432/documentManager \
 # 2. Start the API.
 cp .env.example .env   # then edit values
 go run ./cmd/api
+
+# 3. In another terminal, start the worker (processes uploaded documents).
+go run ./cmd/worker
 ```
 
 The server listens on `:8000` and the frontend continues to call
@@ -74,12 +88,35 @@ The server listens on `:8000` and the frontend continues to call
 # environment or an .env file next to docker-compose.yml.
 docker compose up --build
 
-# Clean slate (drop volumes, re-migrate from empty):
+# Clean slate (drop volumes, re-migrate from empty). REQUIRED when a new
+# migration is added (e.g. 000002_processing_jobs) if you have an old volume:
 docker compose down -v && docker compose up --build
 ```
 
-Compose brings up Postgres, runs the Go `migrate` binary via the `migrate`
-service (which exits 0 on success), then starts the Go API on `:8000`.
+Compose brings up Postgres, runs the Go `migrate` binary (which exits 0 on
+success), then starts the API on `:8000` **and** the worker. Both share the
+`uploads_data` volume for local storage.
+
+## Architecture: async document processing
+
+Upload no longer processes inline. Instead:
+
+1. `POST /api/upload` stores the file, inserts the document (`status=uploaded`),
+   enqueues a `processing_jobs` row (`idempotency_key = doc:{id}`), and returns
+   201 immediately.
+2. The **worker** (`cmd/worker`) polls the queue and claims the oldest due job
+   with `UPDATE ... WHERE id = (SELECT ... FOR UPDATE SKIP LOCKED)`, so multiple
+   workers never grab the same job. Concurrency is bounded by
+   `MAX_CONCURRENT_JOBS`.
+3. The Phase 2 **stub** processor sets `status=processing`, writes a placeholder
+   `extractions` row (`status=completed`), then sets `status=processed,
+   processed=true`. On failure the job retries with backoff (30s → 2m → 10m) up
+   to `max_attempts`, then is marked `failed` and the document `status=error`.
+4. Jobs locked longer than `JOB_LOCK_TIMEOUT_MINUTES` (a crashed worker) are
+   reclaimed as `pending`. Deleting a document cancels its open jobs.
+
+This replaces the Python backend's unsafe `asyncio.create_task(db_session)`,
+which had no persistence, retries, or safe session handling.
 
 ## Migrations
 
@@ -130,8 +167,8 @@ Documents + upload (Phase 1, all require Bearer auth):
 | DELETE | `/api/documents/{id}` | 204; deletes file + row (CASCADE) |
 | GET | `/api/documents/{id}/download` | streams the file; ignores any `filePath` query param |
 | POST | `/api/documents/{id}/favorite` | body `{"favorite": bool}` → `{"success": true}` |
-| GET | `/api/documents/{id}/extraction` | **stub** → 404 until Phase 3 |
-| GET | `/api/documents/{id}/content` | **stub** → 404 until Phase 3 |
+| GET | `/api/documents/{id}/extraction` | `{status, extraction_date, error, content_available}`; 404 if no extraction row |
+| GET | `/api/documents/{id}/content` | extraction content JSON (placeholder until Phase 3); 404 if no row |
 | GET | `/api/documents/{id}/table-markdown` | **stub** → 404 until Phase 3 |
 
 Access control matches the Python backend: a user may act on their own
@@ -174,6 +211,15 @@ curl -s -X POST localhost:8000/api/upload \
 curl -s localhost:8000/api/documents -H "Authorization: Bearer $TOKEN"
 curl -s localhost:8000/api/documents/1/download -H "Authorization: Bearer $TOKEN" -o out.csv
 diff sample.csv out.csv && echo "round-trip OK"
+
+# 4. With the worker running, within ~1-2s the document is processed.
+#    Extraction status should report completed + content_available=true.
+curl -s localhost:8000/api/documents/1/extraction -H "Authorization: Bearer $TOKEN"
+# {"status":"completed","content_available":true, ...}
+curl -s localhost:8000/api/documents/1 -H "Authorization: Bearer $TOKEN"
+# {... "status":"processed","processed":true ...}
+curl -s localhost:8000/api/documents/1/content -H "Authorization: Bearer $TOKEN"
+# {"metadata":{...},"content":{"message":"Extraction deferred to Phase 3"},"extraction_status":"placeholder"}
 ```
 
 ## Tests

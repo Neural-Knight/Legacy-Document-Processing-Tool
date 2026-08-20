@@ -41,6 +41,12 @@ type Config struct {
 	S3Region           string
 	AWSAccessKeyID     string
 	AWSSecretAccessKey string
+
+	// Worker
+	MaxConcurrentJobs     int
+	JobPollIntervalMS     int
+	JobLockTimeoutMinutes int
+	WorkerID              string
 }
 
 // Load reads configuration from the environment, applying defaults that match
@@ -63,6 +69,11 @@ func Load() (*Config, error) {
 		S3Region:           os.Getenv("S3_REGION"),
 		AWSAccessKeyID:     os.Getenv("AWS_ACCESS_KEY_ID"),
 		AWSSecretAccessKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
+
+		MaxConcurrentJobs:     getEnvInt("MAX_CONCURRENT_JOBS", 2),
+		JobPollIntervalMS:     getEnvInt("JOB_POLL_INTERVAL_MS", 1000),
+		JobLockTimeoutMinutes: getEnvInt("JOB_LOCK_TIMEOUT_MINUTES", 30),
+		WorkerID:              getEnv("WORKER_ID", defaultWorkerID()),
 	}
 
 	c.DatabaseURL = resolveDatabaseURL()
@@ -90,6 +101,36 @@ func LoadForMigrate() (*Config, error) {
 		return nil, fmt.Errorf("database configuration missing: set DATABASE_URL or POSTGRES_* env vars")
 	}
 	return c, nil
+}
+
+// LoadForWorker loads the configuration the worker needs (DB + storage + worker
+// settings), without requiring SECRET_KEY (the worker serves no HTTP/auth).
+func LoadForWorker() (*Config, error) {
+	c := &Config{
+		DatabaseURL:           resolveDatabaseURL(),
+		StorageType:           getEnv("STORAGE_TYPE", "local"),
+		LocalStoragePath:      getEnv("LOCAL_STORAGE_PATH", "./uploads"),
+		S3BucketName:          os.Getenv("S3_BUCKET_NAME"),
+		S3Region:              os.Getenv("S3_REGION"),
+		AWSAccessKeyID:        os.Getenv("AWS_ACCESS_KEY_ID"),
+		AWSSecretAccessKey:    os.Getenv("AWS_SECRET_ACCESS_KEY"),
+		MaxConcurrentJobs:     getEnvInt("MAX_CONCURRENT_JOBS", 2),
+		JobPollIntervalMS:     getEnvInt("JOB_POLL_INTERVAL_MS", 1000),
+		JobLockTimeoutMinutes: getEnvInt("JOB_LOCK_TIMEOUT_MINUTES", 30),
+		WorkerID:              getEnv("WORKER_ID", defaultWorkerID()),
+	}
+	if c.DatabaseURL == "" {
+		return nil, fmt.Errorf("database configuration missing: set DATABASE_URL or POSTGRES_* env vars")
+	}
+	return c, nil
+}
+
+// defaultWorkerID returns the hostname, or "worker" if it can't be determined.
+func defaultWorkerID() string {
+	if h, err := os.Hostname(); err == nil && h != "" {
+		return h
+	}
+	return "worker"
 }
 
 // resolveDatabaseURL prefers an explicit DATABASE_URL, otherwise assembles one

@@ -2,6 +2,7 @@
 package api
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -13,17 +14,21 @@ import (
 	"github.com/legacy-document-processing-tool/backend/internal/auth"
 	"github.com/legacy-document-processing-tool/backend/internal/config"
 	"github.com/legacy-document-processing-tool/backend/internal/documents"
+	"github.com/legacy-document-processing-tool/backend/internal/jobs"
 	"github.com/legacy-document-processing-tool/backend/internal/repository"
 	"github.com/legacy-document-processing-tool/backend/internal/storage"
 )
 
-// NewRouter builds the fully-wired HTTP handler.
+// NewRouter builds the fully-wired HTTP handler. It returns an error if a
+// required dependency (e.g. the storage backend) cannot be constructed, so the
+// caller can fail fast rather than serve a half-initialized app.
 //
 // Route layout preserves the Python contracts:
 //   - GET  /health, GET /ready         (health probes)
 //   - GET  /                           (welcome message)
 //   - {API_V1_STR}/auth/*              (auth endpoints; default /api/auth/*)
-func NewRouter(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Handler {
+//   - {API_V1_STR}/upload, /documents/* (Phase 1 documents)
+func NewRouter(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) (http.Handler, error) {
 	queries := repository.New(pool)
 	tokens := auth.NewTokenService(cfg.SecretKey, durationMinutes(cfg.AccessTokenExpireMinutes))
 	authSvc := auth.NewService(queries, tokens)
@@ -31,13 +36,15 @@ func NewRouter(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Ha
 	authHandler := handlers.NewAuthHandler(queries, authSvc, cfg.AccessTokenExpireMinutes, cfg.RefreshTokenExpireDays)
 	healthHandler := handlers.NewHealthHandler(pool)
 
-	// Storage backend (local | s3) for documents. A construction error (e.g. an
-	// S3 misconfiguration) is logged; local storage never fails here.
+	// Storage backend (local | s3) for documents. Fail fast on error rather than
+	// pass a nil store into the documents service (which would panic on upload).
 	store, err := storage.New(cfg)
 	if err != nil {
-		log.Error("storage init failed; document endpoints will error until fixed", slog.Any("error", err))
+		return nil, fmt.Errorf("storage init: %w", err)
 	}
-	docSvc := documents.NewService(queries, store, cfg.MaxUploadSizeMB)
+	// Jobs service: upload enqueues a processing job; delete cancels open jobs.
+	jobSvc := jobs.NewService(queries)
+	docSvc := documents.NewService(queries, store, cfg.MaxUploadSizeMB, jobSvc)
 	docHandler := handlers.NewDocumentHandler(queries, docSvc)
 
 	r := chi.NewRouter()
@@ -102,7 +109,7 @@ func NewRouter(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) http.Ha
 		})
 	})
 
-	return r
+	return r, nil
 }
 
 func writeWelcome(w http.ResponseWriter) {

@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/legacy-document-processing-tool/backend/internal/jobs"
 	"github.com/legacy-document-processing-tool/backend/internal/repository"
 	"github.com/legacy-document-processing-tool/backend/internal/storage"
 )
@@ -30,16 +31,17 @@ var (
 	ErrTooLarge = errors.New("File exceeds maximum upload size")
 )
 
-// Service orchestrates document persistence and file storage.
+// Service orchestrates document persistence, file storage, and job enqueueing.
 type Service struct {
 	queries     *repository.Queries
 	store       storage.ObjectStorage
 	maxUploadMB int
+	jobs        *jobs.Service
 }
 
 // NewService builds the document service.
-func NewService(queries *repository.Queries, store storage.ObjectStorage, maxUploadMB int) *Service {
-	return &Service{queries: queries, store: store, maxUploadMB: maxUploadMB}
+func NewService(queries *repository.Queries, store storage.ObjectStorage, maxUploadMB int, jobSvc *jobs.Service) *Service {
+	return &Service{queries: queries, store: store, maxUploadMB: maxUploadMB, jobs: jobSvc}
 }
 
 // IsValidExtension reports whether filename has a supported extension
@@ -115,6 +117,18 @@ func (s *Service) Upload(ctx context.Context, userID int32, originalFilename, co
 		_ = s.store.Delete(ctx, key)
 		return repository.Document{}, fmt.Errorf("create document: %w", err)
 	}
+
+	// Enqueue an extraction job. The worker will pick it up asynchronously; the
+	// document is returned immediately with status="uploaded" (upload does not
+	// block on processing). If enqueue fails, roll back so we don't leave an
+	// orphaned, never-processed document.
+	if s.jobs != nil {
+		if _, err := s.jobs.Enqueue(ctx, doc.ID); err != nil {
+			_, _ = s.queries.DeleteDocument(ctx, doc.ID)
+			_ = s.store.Delete(ctx, key)
+			return repository.Document{}, fmt.Errorf("enqueue job: %w", err)
+		}
+	}
 	return doc, nil
 }
 
@@ -126,9 +140,17 @@ func (s *Service) Download(ctx context.Context, doc repository.Document) (io.Rea
 	return s.store.Download(ctx, *doc.FilePath)
 }
 
-// Delete removes the stored file (best effort) then the DB row. CASCADE on the
-// schema handles favorites/extractions/vector_entries.
+// Delete cancels any open jobs, removes the stored file (best effort), then the
+// DB row. CASCADE handles favorites/extractions/vector_entries/processing_jobs.
 func (s *Service) Delete(ctx context.Context, doc repository.Document) error {
+	// Cancel pending/running jobs first so the worker doesn't process a document
+	// that's about to disappear. (The row would also cascade-delete, but an
+	// in-flight worker may already hold it; cancelling narrows that window.)
+	if s.jobs != nil {
+		if _, err := s.jobs.CancelForDocument(ctx, doc.ID); err != nil {
+			return fmt.Errorf("cancel jobs: %w", err)
+		}
+	}
 	if doc.FilePath != nil {
 		if err := s.store.Delete(ctx, *doc.FilePath); err != nil {
 			return fmt.Errorf("delete file: %w", err)
@@ -140,9 +162,26 @@ func (s *Service) Delete(ctx context.Context, doc repository.Document) error {
 	return nil
 }
 
-// guessContentType returns a MIME type for the filename, defaulting to
+// knownContentTypes pins MIME types for the supported extensions so uploads
+// get a sensible type even when the OS mime table is sparse and the client
+// sent no Content-Type.
+var knownContentTypes = map[string]string{
+	"csv":  "text/csv",
+	"json": "application/json",
+	"xml":  "application/xml",
+	"pdf":  "application/pdf",
+	"xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	"xls":  "application/vnd.ms-excel",
+}
+
+// guessContentType returns a MIME type for the filename: first our pinned map
+// for supported types, then the OS mime table, defaulting to
 // application/octet-stream (mirrors the Python mimetypes fallback).
 func guessContentType(filename string) string {
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(filename)), ".")
+	if ct, ok := knownContentTypes[ext]; ok {
+		return ct
+	}
 	if ct := mime.TypeByExtension(filepath.Ext(filename)); ct != "" {
 		return ct
 	}

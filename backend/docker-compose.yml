@@ -58,6 +58,30 @@ services:
       - STORAGE_TYPE=${STORAGE_TYPE:-local}
       - LOCAL_STORAGE_PATH=/app/uploads
 
+  # Document-processing worker. Shares the same image and the uploads volume as
+  # the backend; runs the worker binary instead of the API. Claims jobs from the
+  # processing_jobs queue with bounded concurrency.
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    entrypoint: ["/usr/local/bin/worker"]
+    restart: unless-stopped
+    volumes:
+      - uploads_data:/app/uploads
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - STORAGE_TYPE=${STORAGE_TYPE:-local}
+      - LOCAL_STORAGE_PATH=/app/uploads
+      - MAX_CONCURRENT_JOBS=${MAX_CONCURRENT_JOBS:-2}
+      - JOB_POLL_INTERVAL_MS=${JOB_POLL_INTERVAL_MS:-1000}
+      - JOB_LOCK_TIMEOUT_MINUTES=${JOB_LOCK_TIMEOUT_MINUTES:-30}
+
 volumes:
   postgres_data:
   uploads_data:

@@ -71,7 +71,7 @@ func (f *fakeStore) Delete(ctx context.Context, key string) error {
 }
 
 func TestUploadRejectsUnsupportedType(t *testing.T) {
-	svc := NewService(nil, newFakeStore(), 50)
+	svc := NewService(nil, newFakeStore(), 50, nil)
 	_, err := svc.Upload(context.Background(), 1, "notes.txt", "text/plain", strings.NewReader("hi"))
 	if !errors.Is(err, ErrUnsupportedType) {
 		t.Fatalf("expected ErrUnsupportedType, got %v", err)
@@ -81,7 +81,7 @@ func TestUploadRejectsUnsupportedType(t *testing.T) {
 func TestUploadEnforcesSizeLimit(t *testing.T) {
 	store := newFakeStore()
 	// 1 MB limit; feed ~2 MB of data.
-	svc := NewService(nil, store, 1)
+	svc := NewService(nil, store, 1, nil)
 	big := bytes.Repeat([]byte("x"), 2*1024*1024)
 
 	_, err := svc.Upload(context.Background(), 1, "big.csv", "text/csv", bytes.NewReader(big))

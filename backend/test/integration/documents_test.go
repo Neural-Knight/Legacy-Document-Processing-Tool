@@ -54,7 +54,11 @@ func newDocTestServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 		LocalStoragePath:         t.TempDir(),
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	srv := httptest.NewServer(api.NewRouter(cfg, pool, log))
+	handler, err := api.NewRouter(cfg, pool, log)
+	if err != nil {
+		t.Fatalf("build router: %v", err)
+	}
+	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 	t.Cleanup(pool.Close)
 	return srv, pool

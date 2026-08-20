@@ -50,6 +50,22 @@ type Extraction struct {
 	Error          *string          `json:"error"`
 }
 
+type ProcessingJob struct {
+	ID             int64              `json:"id"`
+	DocumentID     int32              `json:"document_id"`
+	Status         string             `json:"status"`
+	Stage          string             `json:"stage"`
+	Attempt        int32              `json:"attempt"`
+	MaxAttempts    int32              `json:"max_attempts"`
+	Error          *string            `json:"error"`
+	IdempotencyKey string             `json:"idempotency_key"`
+	LockedAt       pgtype.Timestamptz `json:"locked_at"`
+	LockedBy       *string            `json:"locked_by"`
+	RunAfter       pgtype.Timestamptz `json:"run_after"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type RefreshToken struct {
 	ID        int32              `json:"id"`
 	Token     string             `json:"token"`

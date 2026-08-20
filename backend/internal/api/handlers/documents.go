@@ -282,27 +282,81 @@ func (h *DocumentHandler) ToggleFavorite(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
 }
 
-// ---- Extraction stubs (return 404 until Phase 3) ----
+// ---- Extraction ----
 
-// GetExtractionStatus is stubbed to 404 until extraction lands in Phase 3
-// (GET /api/documents/{id}/extraction).
+// GetExtractionStatus returns the extraction status for a document, matching
+// Python: {status, extraction_date, error, content_available}. 404 when no
+// extraction row exists yet (GET /api/documents/{id}/extraction).
 func (h *DocumentHandler) GetExtractionStatus(w http.ResponseWriter, r *http.Request) {
-	h.extractionStub(w, r)
+	user, ok := UserFromContext(r.Context())
+	if !ok {
+		respondUnauthorized(w, "Could not validate credentials")
+		return
+	}
+	doc, found := h.loadOwned(w, r, user, "Not enough permissions")
+	if !found {
+		return
+	}
+	ext, err := h.queries.GetExtractionByDocumentID(r.Context(), doc.ID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "Extraction not found")
+		return
+	}
+
+	var extractionDate *time.Time
+	if ext.ExtractionDate.Valid {
+		t := ext.ExtractionDate.Time
+		extractionDate = &t
+	}
+	status := deref(ext.Status)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":            status,
+		"extraction_date":   extractionDate,
+		"error":             ext.Error,
+		"content_available": status == "completed",
+	})
 }
 
-// GetExtractionContent — stub (GET /api/documents/{id}/content).
+// GetExtractionContent returns the extracted content JSON. Until Phase 3 the
+// worker writes a placeholder, so a completed extraction returns that
+// placeholder; a not-yet-completed one returns a status message; missing → 404
+// (GET /api/documents/{id}/content).
 func (h *DocumentHandler) GetExtractionContent(w http.ResponseWriter, r *http.Request) {
-	h.extractionStub(w, r)
+	user, ok := UserFromContext(r.Context())
+	if !ok {
+		respondUnauthorized(w, "Could not validate credentials")
+		return
+	}
+	doc, found := h.loadOwned(w, r, user, "Not enough permissions")
+	if !found {
+		return
+	}
+	ext, err := h.queries.GetExtractionByDocumentID(r.Context(), doc.ID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "Extraction not found")
+		return
+	}
+	status := deref(ext.Status)
+	if status != "completed" {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status":  status,
+			"message": "Content extraction is " + status,
+		})
+		return
+	}
+	// ext.Content is raw JSON; write it through unchanged.
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if len(ext.Content) > 0 {
+		_, _ = w.Write(ext.Content)
+	} else {
+		_, _ = w.Write([]byte("null"))
+	}
 }
 
-// GetTableMarkdown — stub (GET /api/documents/{id}/table-markdown).
+// GetTableMarkdown remains a 404 stub until real table extraction lands in
+// Phase 3 (GET /api/documents/{id}/table-markdown).
 func (h *DocumentHandler) GetTableMarkdown(w http.ResponseWriter, r *http.Request) {
-	h.extractionStub(w, r)
-}
-
-// extractionStub enforces ownership (matching Python's 403 before 404) then
-// returns 404 "Extraction not found" since no extraction row can exist yet.
-func (h *DocumentHandler) extractionStub(w http.ResponseWriter, r *http.Request) {
 	user, ok := UserFromContext(r.Context())
 	if !ok {
 		respondUnauthorized(w, "Could not validate credentials")
