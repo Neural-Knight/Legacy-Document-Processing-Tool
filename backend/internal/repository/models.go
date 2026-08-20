@@ -77,6 +77,16 @@ type RefreshToken struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type TablesMetadatum struct {
+	ID             int32            `json:"id"`
+	TableID        *string          `json:"table_id"`
+	TableName      *string          `json:"table_name"`
+	DocumentID     *int32           `json:"document_id"`
+	PageNumber     *int32           `json:"page_number"`
+	ExtractionDate pgtype.Timestamp `json:"extraction_date"`
+	Status         *string          `json:"status"`
+}
+
 type User struct {
 	ID             int32              `json:"id"`
 	Email          string             `json:"email"`

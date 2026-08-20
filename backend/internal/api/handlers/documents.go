@@ -4,7 +4,9 @@ import (
 	"errors"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -20,13 +22,15 @@ import (
 // app/api/routes/documents.py. Auth is enforced by RequireAuth middleware;
 // ownership rules (owner OR is_superuser) are checked per-request.
 type DocumentHandler struct {
-	queries *repository.Queries
-	docs    *documents.Service
+	queries         *repository.Queries
+	docs            *documents.Service
+	extractionsRoot string // {LOCAL_STORAGE_PATH}/extractions, for table-markdown
 }
 
-// NewDocumentHandler builds the document handler.
-func NewDocumentHandler(queries *repository.Queries, docs *documents.Service) *DocumentHandler {
-	return &DocumentHandler{queries: queries, docs: docs}
+// NewDocumentHandler builds the document handler. extractionsRoot is where the
+// worker writes per-document table markdown (used by GetTableMarkdown).
+func NewDocumentHandler(queries *repository.Queries, docs *documents.Service, extractionsRoot string) *DocumentHandler {
+	return &DocumentHandler{queries: queries, docs: docs, extractionsRoot: extractionsRoot}
 }
 
 // ---- DTO (matches app/schemas/document.py Document shape) ----
@@ -317,10 +321,11 @@ func (h *DocumentHandler) GetExtractionStatus(w http.ResponseWriter, r *http.Req
 	})
 }
 
-// GetExtractionContent returns the extracted content JSON. Until Phase 3 the
-// worker writes a placeholder, so a completed extraction returns that
-// placeholder; a not-yet-completed one returns a status message; missing → 404
-// (GET /api/documents/{id}/content).
+// GetExtractionContent returns the extracted content JSON. For a completed
+// extraction it returns the stored content: the flat structured PDF shape from
+// the Phase 3 extractor (document_type, title, author, pages[]...), or the
+// placeholder wrapper for non-PDF types. A not-yet-completed extraction returns
+// a status message; missing → 404 (GET /api/documents/{id}/content).
 func (h *DocumentHandler) GetExtractionContent(w http.ResponseWriter, r *http.Request) {
 	user, ok := UserFromContext(r.Context())
 	if !ok {
@@ -354,18 +359,142 @@ func (h *DocumentHandler) GetExtractionContent(w http.ResponseWriter, r *http.Re
 	}
 }
 
-// GetTableMarkdown remains a 404 stub until real table extraction lands in
-// Phase 3 (GET /api/documents/{id}/table-markdown).
+// GetTableMarkdown returns the Gemini/pdfplumber table markdown for a document,
+// porting the Python behavior (GET /api/documents/{id}/table-markdown):
+//   - requires an extraction row; if status != "completed" → 200 {status, message}
+//   - resolves files under {extractionsRoot}/doc_{id}*/**/tables/
+//   - ?page_number=N → {"page": N, "content": "<markdown>"}
+//   - no page_number → {"pages": {"1": "...", ...}}
+//   - missing files → 404
 func (h *DocumentHandler) GetTableMarkdown(w http.ResponseWriter, r *http.Request) {
 	user, ok := UserFromContext(r.Context())
 	if !ok {
 		respondUnauthorized(w, "Could not validate credentials")
 		return
 	}
-	if _, found := h.loadOwned(w, r, user, "Not enough permissions"); !found {
+	doc, found := h.loadOwned(w, r, user, "Not enough permissions")
+	if !found {
 		return
 	}
-	writeError(w, http.StatusNotFound, "Extraction not found")
+
+	ext, err := h.queries.GetExtractionByDocumentID(r.Context(), doc.ID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "Extraction not found")
+		return
+	}
+	status := deref(ext.Status)
+	if status != "completed" {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status":  status,
+			"message": "Content extraction is " + status,
+		})
+		return
+	}
+
+	tablesDir, derr := h.findTablesDir(doc.ID)
+	if derr != nil {
+		writeError(w, http.StatusNotFound, derr.Error())
+		return
+	}
+
+	// ?page_number=N → single page.
+	if pn := r.URL.Query().Get("page_number"); pn != "" {
+		page, convErr := strconv.Atoi(pn)
+		if convErr != nil {
+			writeError(w, http.StatusUnprocessableEntity, "invalid page_number")
+			return
+		}
+		content, rerr := os.ReadFile(filepath.Join(tablesDir, "p"+pn+".md"))
+		if rerr != nil {
+			writeError(w, http.StatusNotFound, "Markdown file for page "+pn+" not found")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"page": page, "content": string(content)})
+		return
+	}
+
+	// Otherwise, all pages: {"pages": {"<n>": "<md>"}}.
+	entries, rerr := os.ReadDir(tablesDir)
+	if rerr != nil {
+		writeError(w, http.StatusNotFound, "Tables folder not found")
+		return
+	}
+	pages := map[string]string{}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		m := tableFileRe.FindStringSubmatch(e.Name())
+		if m == nil {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join(tablesDir, e.Name()))
+		if err != nil {
+			continue
+		}
+		pages[m[1]] = string(b)
+	}
+	if len(pages) == 0 {
+		writeError(w, http.StatusNotFound, "No table markdown files found")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"pages": pages})
+}
+
+var tableFileRe = regexp.MustCompile(`^p(\d+)\.md$`)
+
+// findTablesDir locates the tables directory for a document, matching the
+// Python search: {extractionsRoot}/doc_{id}*/<subdir>/tables/.
+func (h *DocumentHandler) findTablesDir(docID int32) (string, error) {
+	root := h.extractionsRoot
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return "", errDocFolderNotFound
+	}
+	// The worker creates exactly "doc_{id}" as the per-document folder. Match it
+	// exactly (guarding against doc_1 vs doc_12).
+	want := "doc_" + strconv.Itoa(int(docID))
+	var docFolder string
+	for _, e := range entries {
+		if e.IsDir() && e.Name() == want {
+			docFolder = e.Name()
+			break
+		}
+	}
+	if docFolder == "" {
+		return "", errDocFolderNotFound
+	}
+	docPath := filepath.Join(root, docFolder)
+
+	// A direct tables/ dir, or under a single timestamped subdir.
+	if dir := filepath.Join(docPath, "tables"); dirExists(dir) {
+		return dir, nil
+	}
+	subs, err := os.ReadDir(docPath)
+	if err == nil {
+		for _, s := range subs {
+			if s.IsDir() {
+				if dir := filepath.Join(docPath, s.Name(), "tables"); dirExists(dir) {
+					return dir, nil
+				}
+			}
+		}
+	}
+	return "", errTablesFolderNotFound
+}
+
+var (
+	errDocFolderNotFound    = errNotFound("Document extraction folder not found")
+	errTablesFolderNotFound = errNotFound("Tables folder not found")
+)
+
+type errNotFound string
+
+func (e errNotFound) Error() string { return string(e) }
+
+func dirExists(p string) bool {
+	info, err := os.Stat(p)
+	return err == nil && info.IsDir()
 }
 
 // ---- helpers ----

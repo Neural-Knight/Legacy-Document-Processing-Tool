@@ -25,6 +25,12 @@ import (
 // newDocTestServer builds a server backed by a temp local-storage dir so
 // uploads don't pollute ./uploads and are cleaned up after the test.
 func newDocTestServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
+	return newDocTestServerWithStorage(t, t.TempDir())
+}
+
+// newDocTestServerWithStorage is like newDocTestServer but with an explicit
+// local-storage root, so extraction tests can locate artifacts under it.
+func newDocTestServerWithStorage(t *testing.T, storageRoot string) (*httptest.Server, *pgxpool.Pool) {
 	t.Helper()
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
@@ -51,7 +57,7 @@ func newDocTestServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 		CORSOrigins:              []string{"http://localhost:3000"},
 		MaxUploadSizeMB:          50,
 		StorageType:              "local",
-		LocalStoragePath:         t.TempDir(),
+		LocalStoragePath:         storageRoot,
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	handler, err := api.NewRouter(cfg, pool, log)
@@ -238,13 +244,26 @@ func TestDocumentLifecycle(t *testing.T) {
 		t.Fatalf("favorites after un-favorite: expected 0, got %d", len(favsAfter))
 	}
 
-	// 7) Extraction stubs → 404
-	for _, sub := range []string{"/extraction", "/content", "/table-markdown"} {
-		resp = authGet(t, srv.URL+"/api/documents/"+itoa(int64(doc.ID))+sub, token)
-		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("stub %s: expected 404, got %d", sub, resp.StatusCode)
+	// 7) Extraction endpoints. This test server runs no worker, so the document
+	// should still be "uploaded" with no extraction row. We only assert the
+	// extraction/content 404s while the doc is unprocessed — if an external
+	// worker (e.g. a Docker worker sharing this DB) has processed it, those
+	// endpoints legitimately return 200, so we skip them to avoid a race.
+	// /table-markdown always 404s until real table extraction exists (Phase 3+
+	// only writes files when Gemini keys are present).
+	rGet := authGet(t, srv.URL+"/api/documents/"+itoa(int64(doc.ID)), token)
+	var cur docJSON
+	json.NewDecoder(rGet.Body).Decode(&cur)
+	rGet.Body.Close()
+
+	if cur.Status == "uploaded" {
+		for _, sub := range []string{"/extraction", "/content"} {
+			resp = authGet(t, srv.URL+"/api/documents/"+itoa(int64(doc.ID))+sub, token)
+			if resp.StatusCode != http.StatusNotFound {
+				t.Fatalf("stub %s (doc still uploaded): expected 404, got %d", sub, resp.StatusCode)
+			}
+			resp.Body.Close()
 		}
-		resp.Body.Close()
 	}
 
 	// 8) Delete → 204, then get → 404

@@ -103,3 +103,14 @@ CREATE TABLE processing_jobs (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Added by migration 000003_tables_metadata.
+CREATE TABLE tables_metadata (
+    id              SERIAL PRIMARY KEY,
+    table_id        VARCHAR(255) UNIQUE,
+    table_name      VARCHAR(255),
+    document_id     INTEGER,
+    page_number     INTEGER,
+    extraction_date TIMESTAMP,
+    status          VARCHAR(50)
+);

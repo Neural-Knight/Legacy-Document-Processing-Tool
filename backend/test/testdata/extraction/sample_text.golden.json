@@ -1,0 +1,14 @@
+{
+  "document_type": "machine-readable",
+  "title": "Untitled",
+  "author": "Unknown",
+  "pages": [
+    {
+      "page_number": 1,
+      "page_content": "Legacy Document Processing Tool Phase 3 sample PDF text layer\nHello world extraction test\n\f",
+      "image_content": [],
+      "isScanned": false,
+      "extraction_method": "text"
+    }
+  ]
+}

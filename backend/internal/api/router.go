@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -45,7 +46,8 @@ func NewRouter(cfg *config.Config, pool *pgxpool.Pool, log *slog.Logger) (http.H
 	// Jobs service: upload enqueues a processing job; delete cancels open jobs.
 	jobSvc := jobs.NewService(queries)
 	docSvc := documents.NewService(queries, store, cfg.MaxUploadSizeMB, jobSvc)
-	docHandler := handlers.NewDocumentHandler(queries, docSvc)
+	extractionsRoot := filepath.Join(cfg.LocalStoragePath, "extractions")
+	docHandler := handlers.NewDocumentHandler(queries, docSvc, extractionsRoot)
 
 	r := chi.NewRouter()
 

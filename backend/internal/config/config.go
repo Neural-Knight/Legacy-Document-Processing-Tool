@@ -47,6 +47,11 @@ type Config struct {
 	JobPollIntervalMS     int
 	JobLockTimeoutMinutes int
 	WorkerID              string
+
+	// Extraction (Phase 3)
+	GeminiKeys        string // space-separated; empty = table extraction disabled
+	OCRLanguage       string // tesseract lang(s), default "eng"
+	MaxPageWorkers    int    // bounded page concurrency for table/OCR work
 }
 
 // Load reads configuration from the environment, applying defaults that match
@@ -72,8 +77,12 @@ func Load() (*Config, error) {
 
 		MaxConcurrentJobs:     getEnvInt("MAX_CONCURRENT_JOBS", 2),
 		JobPollIntervalMS:     getEnvInt("JOB_POLL_INTERVAL_MS", 1000),
-		JobLockTimeoutMinutes: getEnvInt("JOB_LOCK_TIMEOUT_MINUTES", 30),
+		JobLockTimeoutMinutes: getEnvInt("JOB_LOCK_TIMEOUT_MINUTES", 120),
 		WorkerID:              getEnv("WORKER_ID", defaultWorkerID()),
+
+		GeminiKeys:     os.Getenv("GEMINI_KEYS"),
+		OCRLanguage:    getEnv("OCR_LANGUAGE", "eng"),
+		MaxPageWorkers: getEnvInt("MAX_PAGE_WORKERS", 4),
 	}
 
 	c.DatabaseURL = resolveDatabaseURL()
@@ -116,8 +125,12 @@ func LoadForWorker() (*Config, error) {
 		AWSSecretAccessKey:    os.Getenv("AWS_SECRET_ACCESS_KEY"),
 		MaxConcurrentJobs:     getEnvInt("MAX_CONCURRENT_JOBS", 2),
 		JobPollIntervalMS:     getEnvInt("JOB_POLL_INTERVAL_MS", 1000),
-		JobLockTimeoutMinutes: getEnvInt("JOB_LOCK_TIMEOUT_MINUTES", 30),
+		JobLockTimeoutMinutes: getEnvInt("JOB_LOCK_TIMEOUT_MINUTES", 120),
 		WorkerID:              getEnv("WORKER_ID", defaultWorkerID()),
+
+		GeminiKeys:     os.Getenv("GEMINI_KEYS"),
+		OCRLanguage:    getEnv("OCR_LANGUAGE", "eng"),
+		MaxPageWorkers: getEnvInt("MAX_PAGE_WORKERS", 4),
 	}
 	if c.DatabaseURL == "" {
 		return nil, fmt.Errorf("database configuration missing: set DATABASE_URL or POSTGRES_* env vars")

@@ -18,8 +18,16 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/api ./c
 # ---- Runtime stage ----
 FROM alpine:3.20
 
-# TLS roots for any outbound HTTPS (e.g. future S3/Gemini); harmless otherwise.
-RUN apk add --no-cache ca-certificates && adduser -D -u 10001 appuser
+# ca-certificates: TLS roots for outbound HTTPS (Gemini API).
+# poppler-utils: pdftotext/pdftoppm/pdfinfo — the worker's PDF text/render path.
+# tesseract-ocr: OCR for scanned pages (optional; worker degrades if absent).
+# NOTE: the Go OCR path shells out to `tesseract` on rendered page images; it
+# does NOT use ocrmypdf (a deliberate simplification — see MIGRATION.md). If you
+# later switch to the ocrmypdf pipeline, add the `ocrmypdf` package here.
+# The API image doesn't need the extraction tools, but the worker (same image)
+# does; they're small enough to include in the shared runtime.
+RUN apk add --no-cache ca-certificates poppler-utils tesseract-ocr \
+    && adduser -D -u 10001 appuser
 
 COPY --from=build /out/api /usr/local/bin/api
 COPY --from=build /out/migrate /usr/local/bin/migrate

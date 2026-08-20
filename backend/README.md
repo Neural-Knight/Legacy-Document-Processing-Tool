@@ -9,9 +9,14 @@ Implemented so far (see `../MIGRATION.md`):
   storage.
 - **Phase 2**: PostgreSQL-backed job queue + a dedicated worker process. Upload
   enqueues an extraction job; the worker claims it (`FOR UPDATE SKIP LOCKED`)
-  and runs a **stub** processor that sets the document to `processed` and writes
-  a placeholder extraction. Real PDF/table extraction is still deferred (Phase
-  3); `/content` returns the placeholder, `/table-markdown` is still a 404 stub.
+  with bounded concurrency, backoff retries, and stale-lock reclaim.
+- **Phase 3**: real PDF extraction in the worker (`internal/extraction`) — per-page
+  text via poppler (`pdftotext`), scanned-page detection with optional
+  `tesseract` OCR, optional Gemini table markdown, and `md2sql` loading of
+  extracted tables into dynamic SQL tables. `/content` now returns the flat
+  structured PDF JSON the frontend expects; `/table-markdown` serves the
+  per-page markdown. Non-PDF types keep the placeholder wrapper. Indexing / RAG
+  / chat remain deferred (Phase 4).
 
 ## Layout
 
@@ -27,16 +32,20 @@ backend/
 │   ├── storage/             # ObjectStorage interface + local & S3 backends
 │   ├── documents/           # document domain service (id gen, validation, upload/delete/enqueue)
 │   ├── jobs/                # job-queue façade (enqueue/cancel) + backoff schedule
-│   ├── worker/              # poll/claim runner + stub processor
+│   ├── worker/              # poll/claim runner + real (PDF) / placeholder processor
+│   ├── extraction/          # PDF pipeline: poppler text, OCR, Gemini tables, structured JSON
+│   ├── md2sql/              # markdown tables → dynamic SQL tables (statement-by-statement)
 │   ├── api/
 │   │   ├── router.go        # chi routes
 │   │   ├── middleware/      # request id, logging, CORS, recovery
 │   │   └── handlers/        # auth, health, document handlers, auth middleware
 │   └── repository/          # sqlc-generated queries + Migrate() helper
 ├── migrations/              # golang-migrate SQL (embedded); schema source of truth
-├── test/integration/        # end-to-end auth + document + job/worker tests (build tag: integration)
-├── Dockerfile               # Go multi-stage build (api + migrate binaries)
-├── docker-compose.yml       # db + migrate (Go) + backend
+├── test/
+│   ├── integration/         # end-to-end tests incl. PDF extraction (build tag: integration)
+│   └── testdata/extraction/ # sample PDF + golden JSON fixture
+├── Dockerfile               # Go multi-stage build (api + migrate + worker binaries)
+├── docker-compose.yml       # db + migrate + backend + worker
 └── sqlc.yaml
 ```
 
@@ -108,8 +117,8 @@ Upload no longer processes inline. Instead:
    with `UPDATE ... WHERE id = (SELECT ... FOR UPDATE SKIP LOCKED)`, so multiple
    workers never grab the same job. Concurrency is bounded by
    `MAX_CONCURRENT_JOBS`.
-3. The Phase 2 **stub** processor sets `status=processing`, writes a placeholder
-   `extractions` row (`status=completed`), then sets `status=processed,
+3. The processor sets `status=processing`, runs extraction (see below), writes
+   the `extractions` row (`status=completed`), then sets `status=processed,
    processed=true`. On failure the job retries with backoff (30s → 2m → 10m) up
    to `max_attempts`, then is marked `failed` and the document `status=error`.
 4. Jobs locked longer than `JOB_LOCK_TIMEOUT_MINUTES` (a crashed worker) are
@@ -117,6 +126,58 @@ Upload no longer processes inline. Instead:
 
 This replaces the Python backend's unsafe `asyncio.create_task(db_session)`,
 which had no persistence, retries, or safe session handling.
+
+## PDF extraction (Phase 3)
+
+For PDFs the worker's `RealProcessor` runs the `internal/extraction` pipeline:
+
+1. **Type detection** — per-page text is extracted with poppler `pdftotext`; a
+   page with fewer than ~50 non-space chars is treated as scanned. The document
+   is classified `machine-readable` / `scanned` / `mixed` / `Empty PDF`.
+2. **OCR fallback** — scanned pages are rendered (`pdftoppm`) and run through
+   `tesseract` when it's installed. If tesseract is absent, OCR is skipped and
+   the page keeps empty text (the job still completes).
+3. **Gemini tables** (optional) — when `GEMINI_KEYS` is set, each page image is
+   sent to Gemini for table markdown, written to `tables/p{N}.md`. Per-document
+   page work is bounded by `MAX_PAGE_WORKERS`; keys rotate across calls. With no
+   keys, table extraction is skipped gracefully.
+4. **Artifacts** — written under
+   `{LOCAL_STORAGE_PATH}/extractions/doc_{id}/{ts}_{basename}/`
+   (`extraction.json`, `tables/p{N}.md`), matching the Python layout.
+5. **md2sql** — any `tables/*.md` are parsed and loaded into dynamic SQL tables
+   (`{base36ts}_p{N}_*`), executed **one statement at a time** via pgx, and
+   recorded in `tables_metadata`. Table-load failures are logged, not fatal.
+6. **Stored content** — the flat structured JSON
+   (`document_type`, `title`, `author`, `pages[].{page_number, page_content,
+   image_content, isScanned, tables}`) is stored in `extractions.content` and
+   returned by `GET /content`.
+
+Non-PDF types (csv/xlsx/xls/json/xml) keep the placeholder wrapper (real
+tabular parsers are out of scope for Phase 3).
+
+### Extraction env vars
+
+| Var | Purpose | Default |
+|-----|---------|---------|
+| `GEMINI_KEYS` | Space-separated Gemini API keys (rotation); empty → tables skipped | *(empty)* |
+| `OCR_LANGUAGE` | tesseract language(s), e.g. `eng` or `eng+hin` | `eng` |
+| `MAX_PAGE_WORKERS` | Bounded page concurrency for Gemini/OCR per document | `4` |
+| `JOB_LOCK_TIMEOUT_MINUTES` | Reclaim window (raised for long PDFs) | `120` |
+
+### Worker dependencies
+
+The worker needs `poppler-utils` (`pdftotext`, `pdftoppm`) for PDF text/render
+and, optionally, `tesseract-ocr` for scanned pages. Both are installed in the
+Docker image. Locally, install them via your package manager (e.g.
+`brew install poppler tesseract`). The pipeline degrades gracefully when
+tesseract or `GEMINI_KEYS` are absent.
+
+### Golden fixture
+
+`test/testdata/extraction/` holds a small machine-readable sample PDF and a
+golden JSON. `TestGoldenExtractionShape` compares extraction output against it
+and supports `go test ./internal/extraction/ -run TestGoldenExtractionShape -update`
+to regenerate; see that folder's `README.md` for how the fixtures were produced.
 
 ## Migrations
 
@@ -168,8 +229,8 @@ Documents + upload (Phase 1, all require Bearer auth):
 | GET | `/api/documents/{id}/download` | streams the file; ignores any `filePath` query param |
 | POST | `/api/documents/{id}/favorite` | body `{"favorite": bool}` → `{"success": true}` |
 | GET | `/api/documents/{id}/extraction` | `{status, extraction_date, error, content_available}`; 404 if no extraction row |
-| GET | `/api/documents/{id}/content` | extraction content JSON (placeholder until Phase 3); 404 if no row |
-| GET | `/api/documents/{id}/table-markdown` | **stub** → 404 until Phase 3 |
+| GET | `/api/documents/{id}/content` | extraction content JSON — flat structured PDF shape (`document_type`, `title`, `author`, `pages[]`) for PDFs, placeholder wrapper for non-PDF; not-completed → 200 `{status, message}`; no row → 404 |
+| GET | `/api/documents/{id}/table-markdown` | requires completed extraction; `?page_number=N` → `{page, content}`, else `{pages: {N: md}}`; not-completed → 200 `{status, message}`; missing files → 404 |
 
 Access control matches the Python backend: a user may act on their own
 documents; a superuser may act on any.
@@ -228,8 +289,10 @@ curl -s localhost:8000/api/documents/1/content -H "Authorization: Bearer $TOKEN"
 go build ./...                                   # compiles all packages
 go test ./...                                    # unit tests (no DB needed)
 
-# End-to-end auth flow (register → login → /me → refresh → logout).
-# Needs a reachable database; the test applies the Go migrations itself.
+# End-to-end tests: auth flow, document lifecycle, job/worker, and PDF
+# extraction. Needs a reachable database; the test applies the Go migrations
+# itself. The PDF extraction test additionally needs poppler on PATH
+# (`brew install poppler`); it skips gracefully if poppler is absent.
 TEST_DATABASE_URL=postgres://user:pass@localhost:5432/documentManager \
   go test -tags=integration ./test/integration/...
 ```

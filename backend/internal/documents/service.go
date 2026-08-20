@@ -1,7 +1,8 @@
 // Package documents holds the document domain service: filename/ID generation,
 // extension validation, upload-size enforcement, and the upload/delete flows.
 // It ports the relevant behavior of the Python document_processor and
-// storage_service, minus extraction (deferred to Phase 3).
+// storage_service. Upload enqueues an extraction job (Phase 2); the actual
+// extraction runs asynchronously in the worker (Phase 3).
 package documents
 
 import (
@@ -62,18 +63,22 @@ type UploadResult struct {
 }
 
 // Upload validates the file, streams it to storage under a base36-prefixed key,
-// enforces the size limit, and inserts a document row with status="uploaded"
-// and processed=false. Extraction is NOT triggered (Phase 1).
+// enforces the size limit, inserts a document row with status="uploaded" /
+// processed=false, and enqueues an extraction job for the worker to process
+// asynchronously (the upload itself does not block on processing).
 //
 // The reader is wrapped in an io.LimitReader so an oversized upload is rejected
 // rather than buffered. contentType is the client-declared MIME type; when
-// empty it is guessed from the extension.
+// empty (or the generic octet-stream) it is guessed from the extension.
 func (s *Service) Upload(ctx context.Context, userID int32, originalFilename, contentType string, r io.Reader) (repository.Document, error) {
 	if !IsValidExtension(originalFilename) {
 		return repository.Document{}, ErrUnsupportedType
 	}
 
-	if contentType == "" {
+	// Guess from the extension when the client sent nothing, or the generic
+	// octet-stream (curl multipart frequently sends octet-stream, which would
+	// otherwise bypass our csv/pdf/etc. MIME pinning).
+	if contentType == "" || contentType == "application/octet-stream" {
 		contentType = guessContentType(originalFilename)
 	}
 

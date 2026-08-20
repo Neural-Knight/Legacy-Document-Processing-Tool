@@ -1,5 +1,5 @@
 // Command worker runs the document-processing worker: it polls the
-// processing_jobs queue and runs the (Phase 2 stub) processor with bounded
+// processing_jobs queue and runs the extraction processor with bounded
 // concurrency. It assumes the schema already exists (docker-compose runs the
 // migrate service first); it does not migrate.
 package main
@@ -9,12 +9,14 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/legacy-document-processing-tool/backend/internal/config"
+	"github.com/legacy-document-processing-tool/backend/internal/extraction"
 	"github.com/legacy-document-processing-tool/backend/internal/repository"
 	"github.com/legacy-document-processing-tool/backend/internal/worker"
 )
@@ -45,7 +47,29 @@ func run(log *slog.Logger) error {
 	defer pool.Close()
 
 	queries := repository.New(pool)
-	processor := worker.NewStubProcessor(queries)
+
+	// Build the Phase 3 extraction pipeline. The PDF text engine (poppler) is
+	// used when the binaries are present; Gemini table extraction and OCR are
+	// optional and degrade gracefully when unconfigured/unavailable.
+	var pdfExtractor extraction.Extractor
+	if extraction.PopplerAvailable() {
+		deps := extraction.Deps{
+			PDF:    extraction.NewPopplerEngine(),
+			Tables: extraction.NewGeminiClient(),
+			OCR:    extraction.NewTesseractOCR(cfg.OCRLanguage),
+			Log:    log,
+		}
+		extractionsRoot := filepath.Join(cfg.LocalStoragePath, "extractions")
+		pdfExtractor = extraction.NewPDFExtractor(deps, extractionsRoot, cfg.MaxPageWorkers)
+		log.Info("PDF extraction enabled (poppler)",
+			slog.Bool("gemini_tables", deps.Tables.Enabled()),
+			slog.Bool("ocr", deps.OCR.Available()),
+		)
+	} else {
+		log.Warn("poppler not found; PDFs will use placeholder extraction (install poppler-utils)")
+	}
+
+	processor := worker.NewRealProcessor(queries, pool, pdfExtractor, cfg.LocalStoragePath, log)
 
 	runner := worker.NewRunner(queries, processor, log, worker.Options{
 		WorkerID:      cfg.WorkerID,
